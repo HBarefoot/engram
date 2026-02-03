@@ -1,0 +1,42 @@
+[
+  {
+    "content": "User prefers Fastify over Express for Node.js APIs",
+    "category": "preference",
+    "entity": "fastify",
+    "confidence": 0.9,
+    "namespace": "default",
+    "tags": ["nodejs", "api"]
+  },
+  {
+    "content": "Project uses PostgreSQL 15 as the primary database",
+    "category": "fact",
+    "entity": "postgresql",
+    "confidence": 1.0,
+    "namespace": "project-api",
+    "tags": ["database"]
+  },
+  {
+    "content": "Deployment is done via GitHub Actions to AWS",
+    "category": "pattern",
+    "entity": "github",
+    "confidence": 0.85,
+    "namespace": "default",
+    "tags": ["deployment", "ci-cd"]
+  },
+  {
+    "content": "Decided to use Tailwind CSS because it reduces custom CSS overhead",
+    "category": "decision",
+    "entity": "tailwind",
+    "confidence": 0.9,
+    "namespace": "frontend",
+    "tags": ["css", "styling"]
+  },
+  {
+    "content": "Migration to Vite improved build time by 60%",
+    "category": "outcome",
+    "entity": "vite",
+    "confidence": 0.95,
+    "namespace": "frontend",
+    "tags": ["build", "performance"]
+  }
+]

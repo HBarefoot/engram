@@ -1,0 +1,153 @@
+import { describe, it, expect } from 'vitest';
+import {
+  detectSecrets,
+  redactSecrets,
+  validateContent
+} from '../../src/extract/secrets.js';
+
+describe('Secret Detection', () => {
+  describe('detectSecrets', () => {
+    it('should detect OpenAI API keys', () => {
+      const content = 'My API key is sk-1234567890abcdefghijklmnopqrstuvwxyz';
+      const result = detectSecrets(content);
+
+      expect(result.hasSecrets).toBe(true);
+      expect(result.secrets.length).toBeGreaterThan(0);
+      expect(result.secrets[0].type).toBe('OpenAI API Key');
+    });
+
+    it('should detect AWS access keys', () => {
+      const content = 'AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE';
+      const result = detectSecrets(content);
+
+      expect(result.hasSecrets).toBe(true);
+      expect(result.secrets.some(s => s.type === 'AWS Access Key ID')).toBe(true);
+    });
+
+    it('should detect GitHub tokens', () => {
+      const content = 'token: ghp_1234567890abcdefghijklmnopqrstuv';
+      const result = detectSecrets(content);
+
+      expect(result.hasSecrets).toBe(true);
+      expect(result.secrets.some(s => s.type.includes('GitHub'))).toBe(true);
+    });
+
+    it('should detect private keys', () => {
+      const content = '-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA...';
+      const result = detectSecrets(content);
+
+      expect(result.hasSecrets).toBe(true);
+      expect(result.secrets.some(s => s.type === 'Private Key')).toBe(true);
+    });
+
+    it('should detect connection strings with credentials', () => {
+      const content = 'mongodb://user:password123@localhost:27017/db';
+      const result = detectSecrets(content);
+
+      expect(result.hasSecrets).toBe(true);
+      expect(result.secrets.some(s => s.type.includes('Connection String'))).toBe(true);
+    });
+
+    it('should detect JWT tokens', () => {
+      const content = 'token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U';
+      const result = detectSecrets(content);
+
+      expect(result.hasSecrets).toBe(true);
+      expect(result.secrets.some(s => s.type === 'JWT Token')).toBe(true);
+    });
+
+    it('should detect secret environment variables', () => {
+      const content = 'API_KEY=super_secret_key_12345';
+      const result = detectSecrets(content);
+
+      expect(result.hasSecrets).toBe(true);
+      expect(result.secrets.some(s => s.type === 'Secret Environment Variable')).toBe(true);
+    });
+
+    it('should not detect secrets in safe content', () => {
+      const content = 'User prefers Docker for containerization and uses Nginx';
+      const result = detectSecrets(content);
+
+      expect(result.hasSecrets).toBe(false);
+      expect(result.secrets.length).toBe(0);
+    });
+
+    it('should handle empty content', () => {
+      const content = '';
+      const result = detectSecrets(content);
+
+      expect(result.hasSecrets).toBe(false);
+      expect(result.secrets.length).toBe(0);
+    });
+  });
+
+  describe('redactSecrets', () => {
+    it('should redact API keys', () => {
+      const content = 'My API key is sk-1234567890abcdefghijklmnopqrstuvwxyz and it works';
+      const redacted = redactSecrets(content);
+
+      expect(redacted).not.toContain('sk-1234567890');
+      expect(redacted).toContain('[REDACTED]');
+      expect(redacted).toContain('and it works');
+    });
+
+    it('should redact multiple secrets', () => {
+      const content = 'API_KEY=secret123 and PASSWORD=password456';
+      const redacted = redactSecrets(content);
+
+      expect(redacted).toContain('[REDACTED]');
+      expect(redacted).not.toContain('secret123');
+      expect(redacted).not.toContain('password456');
+    });
+
+    it('should not modify content without secrets', () => {
+      const content = 'User prefers Docker for containerization';
+      const redacted = redactSecrets(content);
+
+      expect(redacted).toBe(content);
+    });
+  });
+
+  describe('validateContent', () => {
+    it('should validate safe content', () => {
+      const content = 'User prefers PostgreSQL over MySQL';
+      const result = validateContent(content);
+
+      expect(result.valid).toBe(true);
+      expect(result.content).toBe(content);
+      expect(result.warnings).toEqual([]);
+    });
+
+    it('should reject content with secrets by default', () => {
+      const content = 'API key: sk-1234567890abcdefghijklmnopqrstuvwxyz';
+      const result = validateContent(content);
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toBeDefined();
+      expect(result.errors.length).toBeGreaterThan(0);
+      expect(result.warnings.some(w => w.includes('sensitive'))).toBe(true);
+    });
+
+    it('should auto-redact when option is enabled', () => {
+      const content = 'API key: sk-1234567890abcdefghijklmnopqrstuvwxyz for production';
+      const result = validateContent(content, { autoRedact: true });
+
+      expect(result.valid).toBe(true);
+      expect(result.content).toContain('[REDACTED]');
+      expect(result.content).toContain('for production');
+      expect(result.warnings.length).toBeGreaterThan(0);
+      expect(result.warnings[0]).toContain('Redacted');
+    });
+
+    it('should handle multiple secrets with auto-redact', () => {
+      const content = 'Keys: sk-1234567890abcdefghijklmnopqrstuvwxyz and ghp-1234567890abcdefghijklmnopqrstuv';
+      const result = validateContent(content, { autoRedact: true });
+
+      expect(result.valid).toBe(true);
+      // Both secrets should be redacted
+      expect(result.content).toContain('[REDACTED]');
+      expect(result.content).not.toBe(content); // Content was modified
+      expect(result.warnings.length).toBeGreaterThan(0);
+    });
+  });
+});

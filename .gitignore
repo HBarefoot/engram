@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+dashboard/node_modules/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build outputs
+dist/
+build/
+dashboard/dist/
+
+# Models cache
+.engram/models/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Internal build docs
+engram-build-prompt.md
