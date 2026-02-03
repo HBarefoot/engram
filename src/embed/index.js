@@ -1,7 +1,11 @@
 import { pipeline } from '@xenova/transformers';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import * as logger from '../utils/logger.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Cached pipeline instance
@@ -157,13 +161,65 @@ export function cosineSimilarity(a, b) {
 
 /**
  * Check if embedding model is available (cached)
- * @param {string} modelsPath - Path to models directory
- * @returns {boolean} True if model is downloaded
+ * @param {string} modelsPath - Path to models directory (may be overridden)
+ * @returns {Object} Object with available flag and actual path
  */
 export function isModelAvailable(modelsPath) {
-  // Check if the models directory contains the model files
-  // This is a simplified check - the actual model files might be in subdirectories
-  return fs.existsSync(modelsPath) && fs.readdirSync(modelsPath).length > 0;
+  // First check the provided modelsPath
+  if (fs.existsSync(modelsPath) && fs.readdirSync(modelsPath).length > 0) {
+    return { available: true, path: modelsPath };
+  }
+
+  // Check Xenova transformers cache in node_modules (most common for local dev)
+  const possiblePaths = [
+    path.resolve(__dirname, '../../node_modules/@xenova/transformers/.cache/Xenova/all-MiniLM-L6-v2'),
+  ];
+
+  // Add home directory cache paths
+  const homeDir = process.env.HOME || process.env.USERPROFILE;
+  if (homeDir) {
+    possiblePaths.push(path.join(homeDir, '.cache', 'huggingface', 'hub', 'models--Xenova--all-MiniLM-L6-v2'));
+  }
+
+  for (const cachePath of possiblePaths) {
+    try {
+      if (fs.existsSync(cachePath) && fs.readdirSync(cachePath).length > 0) {
+        return { available: true, path: cachePath };
+      }
+    } catch (e) {
+      // Continue checking other paths
+    }
+  }
+
+  return { available: false, path: modelsPath };
+}
+
+/**
+ * Calculate directory size recursively
+ * @param {string} dirPath - Directory path
+ * @returns {number} Size in bytes
+ */
+function getDirectorySize(dirPath) {
+  let size = 0;
+  try {
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    for (const entry of entries) {
+      const fullPath = path.join(dirPath, entry.name);
+      if (entry.isFile()) {
+        try {
+          const stats = fs.statSync(fullPath);
+          size += stats.size;
+        } catch (e) {
+          // Skip unreadable files
+        }
+      } else if (entry.isDirectory()) {
+        size += getDirectorySize(fullPath);
+      }
+    }
+  } catch (e) {
+    // Return 0 if directory can't be read
+  }
+  return size;
 }
 
 /**
@@ -172,23 +228,13 @@ export function isModelAvailable(modelsPath) {
  * @returns {Object} Model information
  */
 export function getModelInfo(modelsPath) {
-  const available = isModelAvailable(modelsPath);
+  const modelCheck = isModelAvailable(modelsPath);
+  const available = modelCheck.available;
+  const actualPath = modelCheck.path;
 
   let size = 0;
   if (available) {
-    // Calculate total size of model files
-    const files = fs.readdirSync(modelsPath, { recursive: true, withFileTypes: true });
-    for (const file of files) {
-      if (file.isFile()) {
-        const filePath = path.join(file.path || modelsPath, file.name);
-        try {
-          const stats = fs.statSync(filePath);
-          size += stats.size;
-        } catch (error) {
-          // Skip files that can't be read
-        }
-      }
-    }
+    size = getDirectorySize(actualPath);
   }
 
   return {
@@ -198,6 +244,6 @@ export function getModelInfo(modelsPath) {
     cached: cachedPipeline !== null,
     sizeBytes: size,
     sizeMB: Math.round(size / (1024 * 1024)),
-    path: modelsPath
+    path: actualPath
   };
 }
