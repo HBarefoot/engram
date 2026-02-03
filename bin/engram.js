@@ -9,7 +9,9 @@ import { recallMemories, formatRecallResults } from '../src/memory/recall.js';
 import { consolidate, getConflicts } from '../src/memory/consolidate.js';
 import { validateContent } from '../src/extract/secrets.js';
 import { extractMemory } from '../src/extract/rules.js';
+import { exportToStatic } from '../src/export/static.js';
 import * as logger from '../src/utils/logger.js';
+import fs from 'fs';
 
 const program = new Command();
 
@@ -345,6 +347,58 @@ program
           });
           console.log('');
         });
+      }
+
+      db.close();
+    } catch (error) {
+      console.error('❌ Error:', error.message);
+      process.exit(1);
+    }
+  });
+
+// Export context command
+program
+  .command('export-context')
+  .description('Export memories to a static context file')
+  .requiredOption('-n, --namespace <name>', 'Namespace to export from')
+  .option('-o, --output <path>', 'Output file path (stdout if omitted)')
+  .option('-f, --format <type>', 'Format: markdown, claude, txt, json', 'markdown')
+  .option('-c, --categories <list>', 'Comma-separated list of categories')
+  .option('--min-confidence <score>', 'Minimum confidence (0-1)', parseFloat, 0.5)
+  .option('--min-access <count>', 'Minimum access count', parseInt, 0)
+  .option('--include-low-feedback', 'Include memories with negative feedback', false)
+  .option('--group-by <field>', 'Group by: category, entity, none', 'category')
+  .option('--header <text>', 'Custom header text')
+  .option('--footer <text>', 'Custom footer text')
+  .option('--config <path>', 'Path to config file')
+  .action((options) => {
+    try {
+      const config = loadConfig(options.config);
+      const db = initDatabase(getDatabasePath(config));
+
+      const categories = options.categories ? options.categories.split(',') : undefined;
+
+      const result = exportToStatic(db, {
+        namespace: options.namespace,
+        format: options.format,
+        categories,
+        minConfidence: options.minConfidence,
+        minAccess: options.minAccess,
+        includeLowFeedback: options.includeLowFeedback,
+        groupBy: options.groupBy,
+        header: options.header,
+        footer: options.footer
+      });
+
+      if (options.output) {
+        // Write to file
+        fs.writeFileSync(options.output, result.content, 'utf8');
+        console.log(`✅ Exported ${result.stats.totalExported} memories to ${options.output}`);
+        console.log(`   Size: ${result.stats.sizeKB} KB`);
+        console.log(`   By category:`, result.stats.byCategory);
+      } else {
+        // Output to stdout
+        console.log(result.content);
       }
 
       db.close();

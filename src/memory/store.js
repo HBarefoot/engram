@@ -3,6 +3,12 @@ import { generateId } from '../utils/id.js';
 import * as logger from '../utils/logger.js';
 
 /**
+ * Deduplication thresholds
+ */
+const DUPLICATE_THRESHOLD = 0.95; // Nearly identical - reject
+const MERGE_THRESHOLD = 0.92;     // Similar but adds info - merge
+
+/**
  * Initialize the database and run migrations
  * @param {string} dbPath - Path to SQLite database file
  * @returns {Database} SQLite database instance
@@ -44,9 +50,29 @@ function runMigrations(db) {
       updated_at INTEGER NOT NULL,
       last_accessed INTEGER,
       access_count INTEGER DEFAULT 0,
-      decay_rate REAL DEFAULT 0.01
+      decay_rate REAL DEFAULT 0.01,
+      feedback_score REAL DEFAULT 0.0
     );
   `);
+
+  // Memory feedback table for confidence adjustments
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS memory_feedback (
+      id TEXT PRIMARY KEY,
+      memory_id TEXT NOT NULL,
+      helpful INTEGER NOT NULL,
+      context TEXT,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (memory_id) REFERENCES memories(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Add feedback_score column if it doesn't exist (migration for existing databases)
+  try {
+    db.exec(`ALTER TABLE memories ADD COLUMN feedback_score REAL DEFAULT 0.0`);
+  } catch (error) {
+    // Column already exists, ignore
+  }
 
   // Full-text search index
   db.exec(`
@@ -91,6 +117,9 @@ function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_memories_confidence ON memories(confidence);
     CREATE INDEX IF NOT EXISTS idx_memories_created_at ON memories(created_at);
     CREATE INDEX IF NOT EXISTS idx_memories_last_accessed ON memories(last_accessed);
+    CREATE INDEX IF NOT EXISTS idx_memories_feedback_score ON memories(feedback_score);
+    CREATE INDEX IF NOT EXISTS idx_memories_namespace_created ON memories(namespace, created_at);
+    CREATE INDEX IF NOT EXISTS idx_memory_feedback_memory_id ON memory_feedback(memory_id);
   `);
 
   // Metadata table for system state
@@ -105,7 +134,172 @@ function runMigrations(db) {
 }
 
 /**
- * Store a new memory
+ * Check for duplicate memories using embedding similarity
+ * @param {Database} db - SQLite database instance
+ * @param {Float32Array} embedding - Embedding of new content
+ * @param {string} namespace - Namespace to search in
+ * @returns {Object|null} Duplicate info or null if no duplicate
+ */
+export function checkDuplicate(db, embedding, namespace) {
+  if (!embedding) {
+    return null;
+  }
+
+  // Get all memories with embeddings in the same namespace
+  const memories = getMemoriesWithEmbeddings(db, namespace);
+
+  if (memories.length === 0) {
+    return null;
+  }
+
+  let bestMatch = null;
+  let highestSimilarity = 0;
+
+  for (const memory of memories) {
+    if (!memory.embedding) continue;
+
+    const similarity = calculateCosineSimilarity(embedding, memory.embedding);
+
+    if (similarity > highestSimilarity && similarity >= MERGE_THRESHOLD) {
+      highestSimilarity = similarity;
+      bestMatch = memory;
+    }
+  }
+
+  if (!bestMatch) {
+    return null;
+  }
+
+  return {
+    memory: bestMatch,
+    similarity: highestSimilarity,
+    isDuplicate: highestSimilarity >= DUPLICATE_THRESHOLD,
+    shouldMerge: highestSimilarity >= MERGE_THRESHOLD && highestSimilarity < DUPLICATE_THRESHOLD
+  };
+}
+
+/**
+ * Calculate cosine similarity between two embeddings
+ * @param {Float32Array} a - First embedding
+ * @param {Float32Array} b - Second embedding
+ * @returns {number} Similarity score (0-1)
+ */
+function calculateCosineSimilarity(a, b) {
+  if (a.length !== b.length) {
+    return 0;
+  }
+
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+
+  for (let i = 0; i < a.length; i++) {
+    dotProduct += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+
+  const similarity = dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+  return Math.max(0, Math.min(1, similarity));
+}
+
+/**
+ * Store a new memory with deduplication check
+ * @param {Database} db - SQLite database instance
+ * @param {Object} memory - Memory object
+ * @param {string} memory.content - Memory content
+ * @param {string} [memory.category='fact'] - Memory category
+ * @param {string} [memory.entity] - Entity this memory is about
+ * @param {number} [memory.confidence=0.8] - Confidence score (0-1)
+ * @param {Float32Array} [memory.embedding] - Embedding vector
+ * @param {string} [memory.source='manual'] - Source of memory
+ * @param {string} [memory.namespace='default'] - Namespace
+ * @param {string[]} [memory.tags=[]] - Tags
+ * @param {number} [memory.decay_rate=0.01] - Decay rate
+ * @param {boolean} [options.force=false] - Bypass deduplication check
+ * @returns {Object} Result object with status, id, and message
+ */
+export function createMemoryWithDedup(db, memory, options = {}) {
+  const { force = false } = options;
+  const namespace = memory.namespace || 'default';
+
+  // Check for duplicates if not forced and embedding is available
+  if (!force && memory.embedding) {
+    const duplicateCheck = checkDuplicate(db, memory.embedding, namespace);
+
+    if (duplicateCheck) {
+      if (duplicateCheck.isDuplicate) {
+        // Nearly identical - reject
+        logger.info('Duplicate memory detected, rejecting', {
+          existingId: duplicateCheck.memory.id,
+          similarity: duplicateCheck.similarity
+        });
+
+        return {
+          status: 'duplicate',
+          id: duplicateCheck.memory.id,
+          message: `Similar memory already exists: ${duplicateCheck.memory.id.substring(0, 8)}`,
+          similarity: duplicateCheck.similarity,
+          existingContent: duplicateCheck.memory.content
+        };
+      }
+
+      if (duplicateCheck.shouldMerge) {
+        // Similar but potentially adds info - merge
+        logger.info('Similar memory found, merging', {
+          existingId: duplicateCheck.memory.id,
+          similarity: duplicateCheck.similarity
+        });
+
+        // Merge: update existing memory with new content if it's longer or has more info
+        const existingMemory = duplicateCheck.memory;
+        const newContent = memory.content.length > existingMemory.content.length
+          ? memory.content
+          : `${existingMemory.content} ${memory.content}`.trim();
+
+        // Merge tags
+        const existingTags = existingMemory.tags || [];
+        const newTags = memory.tags || [];
+        const mergedTags = [...new Set([...existingTags, ...newTags])];
+
+        // Use higher confidence
+        const mergedConfidence = Math.max(
+          existingMemory.confidence || 0.8,
+          memory.confidence || 0.8
+        );
+
+        // Update the existing memory
+        const updated = updateMemory(db, existingMemory.id, {
+          content: newContent,
+          tags: mergedTags,
+          confidence: mergedConfidence,
+          embedding: memory.embedding // Use newer embedding
+        });
+
+        return {
+          status: 'merged',
+          id: existingMemory.id,
+          message: `Memory merged with existing: ${existingMemory.id.substring(0, 8)}`,
+          similarity: duplicateCheck.similarity,
+          memory: updated
+        };
+      }
+    }
+  }
+
+  // No duplicate found or force=true, create new memory
+  const created = createMemory(db, memory);
+
+  return {
+    status: 'created',
+    id: created.id,
+    message: 'Memory stored successfully',
+    memory: created
+  };
+}
+
+/**
+ * Store a new memory (basic version without deduplication)
  * @param {Database} db - SQLite database instance
  * @param {Object} memory - Memory object
  * @param {string} memory.content - Memory content
@@ -414,7 +608,8 @@ function deserializeMemory(row) {
     updated_at: row.updated_at,
     last_accessed: row.last_accessed,
     access_count: row.access_count,
-    decay_rate: row.decay_rate
+    decay_rate: row.decay_rate,
+    feedback_score: row.feedback_score || 0
   };
 
   // Deserialize embedding if present

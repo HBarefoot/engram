@@ -5,6 +5,7 @@ import { recallMemories } from '../memory/recall.js';
 import { consolidate, getConflicts } from '../memory/consolidate.js';
 import { validateContent } from '../extract/secrets.js';
 import { extractMemory } from '../extract/rules.js';
+import { exportToStatic } from '../export/static.js';
 import * as logger from '../utils/logger.js';
 
 /**
@@ -415,6 +416,51 @@ export function createRESTServer(config) {
       };
     } catch (error) {
       logger.error('Installation info error', { error: error.message });
+      reply.code(500);
+      return { error: error.message };
+    }
+  });
+
+  // Export to static context endpoint
+  fastify.post('/api/export/static', async (request, reply) => {
+    try {
+      const {
+        namespace,
+        format = 'markdown',
+        categories,
+        min_confidence = 0.5,
+        min_access = 0,
+        include_low_feedback = false,
+        group_by = 'category',
+        header,
+        footer
+      } = request.body;
+
+      if (!namespace) {
+        reply.code(400);
+        return { error: 'Namespace is required' };
+      }
+
+      const result = exportToStatic(db, {
+        namespace,
+        format,
+        categories,
+        minConfidence: min_confidence,
+        minAccess: min_access,
+        includeLowFeedback: include_low_feedback,
+        groupBy: group_by,
+        header,
+        footer
+      });
+
+      return {
+        success: true,
+        content: result.content,
+        filename: result.filename,
+        stats: result.stats
+      };
+    } catch (error) {
+      logger.error('Export error', { error: error.message });
       reply.code(500);
       return { error: error.message };
     }

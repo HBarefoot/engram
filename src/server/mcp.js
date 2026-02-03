@@ -6,8 +6,10 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 
 import { loadConfig, getDatabasePath, getModelsPath } from '../config/index.js';
-import { initDatabase, createMemory, getMemory, deleteMemory, getStats } from '../memory/store.js';
+import { initDatabase, createMemory, createMemoryWithDedup, getMemory, deleteMemory, getStats } from '../memory/store.js';
 import { recallMemories, formatRecallResults } from '../memory/recall.js';
+import { recordFeedback, getFeedbackStats } from '../memory/feedback.js';
+import { generateContext } from '../memory/context.js';
 import { validateContent } from '../extract/secrets.js';
 import { extractMemory } from '../extract/rules.js';
 import * as logger from '../utils/logger.js';
@@ -89,6 +91,11 @@ export class EngramMCPServer {
                   type: 'array',
                   items: { type: 'string' },
                   description: 'Optional tags for categorization'
+                },
+                force: {
+                  type: 'boolean',
+                  description: 'Bypass deduplication check. If true, memory will be stored even if a similar one exists. Default: false',
+                  default: false
                 }
               },
               required: ['content']
@@ -122,6 +129,25 @@ export class EngramMCPServer {
                   type: 'number',
                   description: 'Minimum relevance score (0.0-1.0). Default 0.3. Increase to get fewer, more relevant results.',
                   default: 0.3
+                },
+                time_filter: {
+                  type: 'object',
+                  description: 'Filter memories by time range. Supports relative times like "3 days ago", "last week", or ISO dates.',
+                  properties: {
+                    after: {
+                      type: 'string',
+                      description: 'Start time - ISO date (2024-01-01) or relative (3 days ago, last week, yesterday)'
+                    },
+                    before: {
+                      type: 'string',
+                      description: 'End time - ISO date or relative (today, now)'
+                    },
+                    period: {
+                      type: 'string',
+                      enum: ['today', 'yesterday', 'this_week', 'last_week', 'this_month', 'last_month', 'this_year', 'last_year'],
+                      description: 'Shorthand for common time periods'
+                    }
+                  }
                 }
               },
               required: ['query']
@@ -139,6 +165,72 @@ export class EngramMCPServer {
                 }
               },
               required: ['memory_id']
+            }
+          },
+          {
+            name: 'engram_feedback',
+            description: 'Provide feedback on a recalled memory to help improve future recall accuracy. Positive feedback increases a memory\'s relevance score; negative feedback decreases it.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                memory_id: {
+                  type: 'string',
+                  description: 'The ID of the memory to provide feedback on (returned by engram_recall)'
+                },
+                helpful: {
+                  type: 'boolean',
+                  description: 'Was this memory helpful in the current context? true = helpful, false = not helpful'
+                },
+                context: {
+                  type: 'string',
+                  description: 'Optional: describe the context or query that prompted this feedback'
+                }
+              },
+              required: ['memory_id', 'helpful']
+            }
+          },
+          {
+            name: 'engram_context',
+            description: 'Generate a pre-formatted context block of relevant memories to inject into your system prompt or conversation. Use this at the start of a session to load relevant user context.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                query: {
+                  type: 'string',
+                  description: 'Optional query to filter relevant memories. If omitted, returns top memories by access frequency and recency.'
+                },
+                namespace: {
+                  type: 'string',
+                  description: 'Namespace to pull context from (default: "default")',
+                  default: 'default'
+                },
+                limit: {
+                  type: 'number',
+                  description: 'Maximum memories to include (1-25). Default 10.',
+                  default: 10
+                },
+                format: {
+                  type: 'string',
+                  enum: ['markdown', 'xml', 'json', 'plain'],
+                  description: 'Output format. markdown=human-readable, xml=structured, json=programmatic, plain=raw text',
+                  default: 'markdown'
+                },
+                include_metadata: {
+                  type: 'boolean',
+                  description: 'Include memory IDs and confidence scores in output',
+                  default: false
+                },
+                categories: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Filter by categories (e.g., ["preference", "fact"])'
+                },
+                max_tokens: {
+                  type: 'number',
+                  description: 'Approximate token budget. Will truncate to fit. Default 1000.',
+                  default: 1000
+                }
+              }
             }
           },
           {
@@ -165,6 +257,10 @@ export class EngramMCPServer {
             return await this.handleRecall(args);
           case 'engram_forget':
             return await this.handleForget(args);
+          case 'engram_feedback':
+            return await this.handleFeedback(args);
+          case 'engram_context':
+            return await this.handleContext(args);
           case 'engram_status':
             return await this.handleStatus(args);
           default:
@@ -189,9 +285,9 @@ export class EngramMCPServer {
    */
   async handleRemember(args) {
     const db = this.initializeDatabase();
-    const { content, category, entity, confidence, namespace, tags } = args;
+    const { content, category, entity, confidence, namespace, tags, force } = args;
 
-    logger.info('Remember requested', { category, entity, namespace });
+    logger.info('Remember requested', { category, entity, namespace, force });
 
     // Validate content for secrets
     const validation = validateContent(content, {
@@ -249,16 +345,32 @@ export class EngramMCPServer {
       logger.warn('Failed to generate embedding, storing without it', { error: error.message });
     }
 
-    // Store memory
-    const memory = createMemory(db, memoryData);
+    // Store memory with deduplication check
+    const result = createMemoryWithDedup(db, memoryData, { force: force || false });
 
-    let responseText = `Memory stored successfully!\n\nID: ${memory.id}\nCategory: ${memory.category}\nEntity: ${memory.entity || 'none'}\nConfidence: ${memory.confidence}\nNamespace: ${memory.namespace}`;
+    let responseText;
+
+    switch (result.status) {
+      case 'duplicate':
+        responseText = `Similar memory already exists (${(result.similarity * 100).toFixed(1)}% match)\n\nExisting ID: ${result.id}\nExisting content: ${result.existingContent}\n\nUse force: true to store anyway.`;
+        logger.info('Duplicate memory rejected', { existingId: result.id, similarity: result.similarity });
+        break;
+
+      case 'merged':
+        responseText = `Memory merged with existing (${(result.similarity * 100).toFixed(1)}% match)\n\nID: ${result.id}\nCategory: ${result.memory.category}\nEntity: ${result.memory.entity || 'none'}\nConfidence: ${result.memory.confidence}\nNamespace: ${result.memory.namespace}\n\nMerged content: ${result.memory.content}`;
+        logger.info('Memory merged', { id: result.id, similarity: result.similarity });
+        break;
+
+      case 'created':
+      default:
+        responseText = `Memory stored successfully!\n\nID: ${result.id}\nCategory: ${result.memory.category}\nEntity: ${result.memory.entity || 'none'}\nConfidence: ${result.memory.confidence}\nNamespace: ${result.memory.namespace}`;
+        logger.info('Memory stored', { id: result.id, category: result.memory.category });
+        break;
+    }
 
     if (validation.warnings && validation.warnings.length > 0) {
       responseText += `\n\nWarnings: ${validation.warnings.join(', ')}`;
     }
-
-    logger.info('Memory stored', { id: memory.id, category: memory.category });
 
     return {
       content: [
@@ -275,9 +387,9 @@ export class EngramMCPServer {
    */
   async handleRecall(args) {
     const db = this.initializeDatabase();
-    const { query, limit = 5, category, namespace, threshold = 0.3 } = args;
+    const { query, limit = 5, category, namespace, threshold = 0.3, time_filter } = args;
 
-    logger.info('Recall requested', { query, limit, category, namespace, threshold });
+    logger.info('Recall requested', { query, limit, category, namespace, threshold, time_filter });
 
     const modelsPath = getModelsPath(this.config);
 
@@ -285,7 +397,7 @@ export class EngramMCPServer {
     const memories = await recallMemories(
       db,
       query,
-      { limit, category, namespace, threshold },
+      { limit, category, namespace, threshold, time_filter },
       modelsPath
     );
 
@@ -348,6 +460,98 @@ export class EngramMCPServer {
         ]
       };
     }
+  }
+
+  /**
+   * Handle engram_feedback tool
+   */
+  async handleFeedback(args) {
+    const db = this.initializeDatabase();
+    const { memory_id, helpful, context } = args;
+
+    logger.info('Feedback requested', { memory_id, helpful, context });
+
+    // Check if memory exists
+    const memory = getMemory(db, memory_id);
+
+    if (!memory) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Memory not found: ${memory_id}`
+          }
+        ]
+      };
+    }
+
+    // Record the feedback
+    const result = recordFeedback(db, memory_id, helpful, context);
+
+    const helpfulText = helpful ? 'helpful' : 'not helpful';
+    let responseText = `Feedback recorded: memory marked as ${helpfulText}\n\n`;
+    responseText += `Memory ID: ${memory_id}\n`;
+    responseText += `Feedback Score: ${result.feedbackScore.toFixed(2)} (${result.helpfulCount} helpful, ${result.unhelpfulCount} unhelpful)\n`;
+
+    if (result.confidenceAdjusted) {
+      responseText += `\nConfidence adjusted to: ${result.newConfidence.toFixed(2)}`;
+    }
+
+    logger.info('Feedback recorded', {
+      memoryId: memory_id,
+      helpful,
+      feedbackScore: result.feedbackScore,
+      confidenceAdjusted: result.confidenceAdjusted
+    });
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: responseText
+        }
+      ]
+    };
+  }
+
+  /**
+   * Handle engram_context tool
+   */
+  async handleContext(args) {
+    const db = this.initializeDatabase();
+    const {
+      query,
+      namespace = 'default',
+      limit = 10,
+      format = 'markdown',
+      include_metadata = false,
+      categories,
+      max_tokens = 1000
+    } = args;
+
+    logger.info('Context requested', { query, namespace, limit, format });
+
+    const modelsPath = getModelsPath(this.config);
+
+    // Generate context
+    const result = await generateContext(db, {
+      query,
+      namespace,
+      limit: Math.min(limit, 25),
+      format,
+      include_metadata,
+      categories,
+      max_tokens
+    }, modelsPath);
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: result.content
+        }
+      ]
+    };
   }
 
   /**

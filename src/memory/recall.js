@@ -1,5 +1,6 @@
 import { generateEmbedding, cosineSimilarity } from '../embed/index.js';
 import { searchMemories, getMemoriesWithEmbeddings, updateAccessStats } from './store.js';
+import { parseTimeFilter, formatTimestamp } from '../utils/time.js';
 import * as logger from '../utils/logger.js';
 
 /**
@@ -11,6 +12,10 @@ import * as logger from '../utils/logger.js';
  * @param {string} [options.category] - Filter by category
  * @param {string} [options.namespace] - Filter by namespace
  * @param {number} [options.threshold=0.3] - Minimum relevance score
+ * @param {Object} [options.time_filter] - Temporal filter
+ * @param {string} [options.time_filter.after] - Start time (ISO or relative)
+ * @param {string} [options.time_filter.before] - End time (ISO or relative)
+ * @param {string} [options.time_filter.period] - Period shorthand
  * @param {string} modelsPath - Path to models directory
  * @returns {Promise<Object[]>} Array of relevant memories with scores
  */
@@ -19,10 +24,14 @@ export async function recallMemories(db, query, options = {}, modelsPath) {
     limit = 5,
     category,
     namespace,
-    threshold = 0.3
+    threshold = 0.3,
+    time_filter
   } = options;
 
-  logger.debug('Recalling memories', { query, limit, category, namespace, threshold });
+  // Parse time filter if provided
+  const timeRange = parseTimeFilter(time_filter);
+
+  logger.debug('Recalling memories', { query, limit, category, namespace, threshold, timeRange });
 
   try {
     // Step 1: Generate embedding for the query
@@ -37,7 +46,7 @@ export async function recallMemories(db, query, options = {}, modelsPath) {
     }
 
     // Step 2: Fetch candidate memories
-    const candidates = await fetchCandidates(db, query, namespace);
+    const candidates = await fetchCandidates(db, query, namespace, timeRange);
     logger.debug('Fetched candidates', { count: candidates.length });
 
     if (candidates.length === 0) {
@@ -77,19 +86,30 @@ export async function recallMemories(db, query, options = {}, modelsPath) {
       updateAccessStats(db, ids);
     }
 
+    // Add time range metadata if temporal filter was used
+    if (timeRange) {
+      results.timeRange = {
+        after: formatTimestamp(timeRange.start),
+        before: formatTimestamp(timeRange.end),
+        description: timeRange.description
+      };
+      results.totalInRange = candidates.length;
+    }
+
     logger.info('Memories recalled', {
       query,
       returned: results.length,
       avgScore: results.length > 0
         ? (results.reduce((sum, m) => sum + m.score, 0) / results.length).toFixed(3)
-        : 0
+        : 0,
+      timeRange: timeRange?.description
     });
 
     return results;
   } catch (error) {
     logger.error('Error during recall', { error: error.message });
     // Fallback to FTS if anything fails
-    return await fallbackToFTS(db, query, { limit, category, namespace });
+    return await fallbackToFTS(db, query, { limit, category, namespace, timeRange });
   }
 }
 
@@ -98,10 +118,18 @@ export async function recallMemories(db, query, options = {}, modelsPath) {
  * @param {Database} db - SQLite database instance
  * @param {string} query - Search query
  * @param {string} [namespace] - Optional namespace filter
+ * @param {Object} [timeRange] - Optional time range filter
  * @returns {Promise<Object[]>} Candidate memories
  */
-async function fetchCandidates(db, query, namespace) {
+async function fetchCandidates(db, query, namespace, timeRange) {
   const candidates = new Map();
+
+  // Time filter function
+  const withinTimeRange = (memory) => {
+    if (!timeRange) return true;
+    const createdAt = memory.created_at;
+    return createdAt >= timeRange.start && createdAt <= timeRange.end;
+  };
 
   // Fetch FTS matches (top 20)
   try {
@@ -111,6 +139,9 @@ async function fetchCandidates(db, query, namespace) {
     if (namespace) {
       ftsResults = ftsResults.filter(m => m.namespace === namespace);
     }
+
+    // Filter by time range if specified
+    ftsResults = ftsResults.filter(withinTimeRange);
 
     for (const memory of ftsResults) {
       memory.fromFTS = true;
@@ -122,7 +153,11 @@ async function fetchCandidates(db, query, namespace) {
   }
 
   // Fetch all memories with embeddings in namespace
-  const embeddedMemories = getMemoriesWithEmbeddings(db, namespace);
+  let embeddedMemories = getMemoriesWithEmbeddings(db, namespace);
+
+  // Filter by time range if specified
+  embeddedMemories = embeddedMemories.filter(withinTimeRange);
+
   for (const memory of embeddedMemories) {
     if (!candidates.has(memory.id)) {
       memory.fromFTS = false;
@@ -160,17 +195,24 @@ function calculateScores(memory, queryEmbedding, allCandidates) {
   // Access score (how often this memory has been recalled)
   const access = Math.min(memory.access_count / 10, 1.0);
 
+  // Feedback score - normalize from [-1, 1] to [0, 1]
+  const feedbackScore = memory.feedback_score || 0;
+  const feedback = (feedbackScore + 1) / 2;
+
   // FTS boost (if memory appeared in FTS results)
   const ftsBoost = memory.fromFTS ? 0.1 : 0;
 
-  // Final score calculation
-  const final = (similarity * 0.5) + (recency * 0.15) + (confidence * 0.2) + (access * 0.05) + ftsBoost;
+  // Final score calculation with feedback component
+  // Adjusted weights: similarity=0.45, recency=0.15, confidence=0.15, access=0.05, feedback=0.10
+  const final = (similarity * 0.45) + (recency * 0.15) + (confidence * 0.15) + (access * 0.05) + (feedback * 0.10) + ftsBoost;
 
   return {
     similarity,
     recency,
     confidence,
     access,
+    feedback,
+    feedbackRaw: feedbackScore,
     ftsBoost,
     final
   };
@@ -201,7 +243,7 @@ function calculateRecencyScore(memory) {
  * @returns {Promise<Object[]>} Search results
  */
 async function fallbackToFTS(db, query, options = {}) {
-  const { limit = 5, category, namespace } = options;
+  const { limit = 5, category, namespace, timeRange } = options;
 
   logger.warn('Using FTS-only fallback search');
 
@@ -216,6 +258,13 @@ async function fallbackToFTS(db, query, options = {}) {
     // Filter by namespace if specified
     if (namespace) {
       results = results.filter(m => m.namespace === namespace);
+    }
+
+    // Filter by time range if specified
+    if (timeRange) {
+      results = results.filter(m =>
+        m.created_at >= timeRange.start && m.created_at <= timeRange.end
+      );
     }
 
     // Take top N
@@ -241,6 +290,15 @@ async function fallbackToFTS(db, query, options = {}) {
       updateAccessStats(db, ids);
     }
 
+    // Add time range metadata if temporal filter was used
+    if (timeRange) {
+      results.timeRange = {
+        after: formatTimestamp(timeRange.start),
+        before: formatTimestamp(timeRange.end),
+        description: timeRange.description
+      };
+    }
+
     logger.info('FTS fallback recall complete', { returned: results.length });
 
     return results;
@@ -257,10 +315,24 @@ async function fallbackToFTS(db, query, options = {}) {
  */
 export function formatRecallResults(memories) {
   if (memories.length === 0) {
-    return 'No relevant memories found.';
+    const noResultsMsg = 'No relevant memories found.';
+    if (memories.timeRange) {
+      return `${noResultsMsg}\n\nTime range: ${memories.timeRange.description} (${memories.timeRange.after} to ${memories.timeRange.before})`;
+    }
+    return noResultsMsg;
   }
 
-  const lines = [`Found ${memories.length} relevant ${memories.length === 1 ? 'memory' : 'memories'}:\n`];
+  let header = `Found ${memories.length} relevant ${memories.length === 1 ? 'memory' : 'memories'}`;
+
+  // Add time range info if present
+  if (memories.timeRange) {
+    header += ` from ${memories.timeRange.description}`;
+    if (memories.totalInRange !== undefined) {
+      header += ` (${memories.totalInRange} total in range)`;
+    }
+  }
+
+  const lines = [`${header}:\n`];
 
   memories.forEach((memory, index) => {
     const num = index + 1;
