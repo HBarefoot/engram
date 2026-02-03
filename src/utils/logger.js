@@ -41,7 +41,7 @@ function formatMessage(level, message, meta) {
  */
 export function debug(message, meta) {
   if (currentLevel <= LOG_LEVELS.DEBUG) {
-    console.log(formatMessage('DEBUG', message, meta));
+    console.error(formatMessage('DEBUG', message, meta));
   }
 }
 
@@ -52,7 +52,7 @@ export function debug(message, meta) {
  */
 export function info(message, meta) {
   if (currentLevel <= LOG_LEVELS.INFO) {
-    console.log(formatMessage('INFO', message, meta));
+    console.error(formatMessage('INFO', message, meta));
   }
 }
 

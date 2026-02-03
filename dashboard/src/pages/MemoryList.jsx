@@ -87,9 +87,9 @@ export default function MemoryList() {
             <input
               type="text"
               value={filters.namespace}
-              onChange={(e) => setFilters({ ...filters, namespace: e.target.value })}
+              onChange={(e) => setFilters({ ...filters, namespace: e.target.value, offset: 0 })}
               placeholder="Filter by namespace"
-              className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500"
+              className="w-full px-3 py-2 border rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500 focus:outline-none"
             />
           </div>
           <div>
@@ -98,8 +98,8 @@ export default function MemoryList() {
             </label>
             <select
               value={filters.category}
-              onChange={(e) => setFilters({ ...filters, category: e.target.value })}
-              className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500"
+              onChange={(e) => setFilters({ ...filters, category: e.target.value, offset: 0 })}
+              className="w-full px-3 py-2 border rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500 focus:outline-none"
             >
               <option value="">All Categories</option>
               <option value="preference">Preference</option>
@@ -115,8 +115,8 @@ export default function MemoryList() {
             </label>
             <select
               value={filters.limit}
-              onChange={(e) => setFilters({ ...filters, limit: parseInt(e.target.value) })}
-              className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500"
+              onChange={(e) => setFilters({ ...filters, limit: parseInt(e.target.value), offset: 0 })}
+              className="w-full px-3 py-2 border rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500 focus:outline-none"
             >
               <option value="10">10</option>
               <option value="25">25</option>
