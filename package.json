@@ -15,7 +15,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "lint": "eslint src/",
-    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
     "pm2:stop": "pm2 stop engram",
     "pm2:restart": "pm2 restart engram",
     "pm2:delete": "pm2 delete engram",
@@ -39,12 +39,12 @@
   "author": "Engram Contributors",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-username/engram.git"
+    "url": "https://github.com/HBarefoot/engram.git"
   },
   "bugs": {
-    "url": "https://github.com/your-username/engram/issues"
+    "url": "https://github.com/HBarefoot/engram/issues"
   },
-  "homepage": "https://github.com/your-username/engram#readme",
+  "homepage": "https://github.com/HBarefoot/engram#readme",
   "engines": {
     "node": ">=20.0.0"
   },

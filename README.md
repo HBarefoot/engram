@@ -212,7 +212,7 @@ pm2 startup
 pm2 save
 ```
 
-PM2 configuration is in [ecosystem.config.js](ecosystem.config.js). Logs are stored in `~/.engram/logs/`.
+PM2 configuration is in [ecosystem.config.cjs](ecosystem.config.cjs). Logs are stored in `~/.engram/logs/`.
 
 ## Architecture
 

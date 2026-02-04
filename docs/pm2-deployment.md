@@ -36,7 +36,7 @@ pm2 --version
 npm run pm2:start
 
 # Or directly with PM2
-pm2 start ecosystem.config.js
+pm2 start ecosystem.config.cjs
 ```
 
 ### Check Service Status
@@ -154,7 +154,7 @@ pm2 unstartup
 
 ## Configuration
 
-The PM2 configuration is defined in [ecosystem.config.js](../ecosystem.config.js):
+The PM2 configuration is defined in [ecosystem.config.cjs](../ecosystem.config.cjs):
 
 ```javascript
 export default {
@@ -201,7 +201,7 @@ export default {
 
 ### Customizing Configuration
 
-Edit `ecosystem.config.js` to customize:
+Edit `ecosystem.config.cjs` to customize:
 
 ```javascript
 // Change port
@@ -362,16 +362,16 @@ pm2 show engram | grep memory
 pm2 restart engram
 
 # Adjust memory limit
-# Edit ecosystem.config.js and set lower max_memory_restart
+# Edit ecosystem.config.cjs and set lower max_memory_restart
 
 # Reload configuration
-pm2 reload ecosystem.config.js
+pm2 reload ecosystem.config.cjs
 ```
 
 ## Production Checklist
 
 - [ ] PM2 installed globally
-- [ ] Service starts successfully: `pm2 start ecosystem.config.js`
+- [ ] Service starts successfully: `pm2 start ecosystem.config.cjs`
 - [ ] Service auto-restarts on crash (test by killing process)
 - [ ] Logs are being written to `~/.engram/logs/`
 - [ ] Auto-start on boot configured: `pm2 startup` + `pm2 save`
@@ -387,7 +387,7 @@ pm2 reload ecosystem.config.js
 For load balancing across CPU cores:
 
 ```javascript
-// ecosystem.config.js
+// ecosystem.config.cjs
 {
   instances: 'max',  // or specific number
   exec_mode: 'cluster'
@@ -399,7 +399,7 @@ For load balancing across CPU cores:
 ### Environment-Specific Configs
 
 ```javascript
-export default {
+module.exports = {
   apps: [{
     name: 'engram',
     script: './bin/engram.js',
@@ -418,7 +418,7 @@ export default {
 Start with specific environment:
 
 ```bash
-pm2 start ecosystem.config.js --env production
+pm2 start ecosystem.config.cjs --env production
 ```
 
 ### Graceful Shutdown
