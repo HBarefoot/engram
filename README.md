@@ -172,6 +172,48 @@ Then open http://localhost:5173 in your browser.
 - ⚠️ Detect and resolve conflicts
 - 🔄 Run consolidation
 
+### 5. PM2 Process Manager (Production Service)
+
+Run Engram as a persistent background service using PM2:
+
+```bash
+# Install PM2 globally (if not already installed)
+npm install -g pm2
+
+# Start Engram as a PM2 service
+npm run pm2:start
+
+# Check status
+npm run pm2:status
+
+# View logs
+npm run pm2:logs
+
+# Restart service
+npm run pm2:restart
+
+# Stop service
+npm run pm2:stop
+
+# Remove from PM2
+npm run pm2:delete
+
+# Monitor in real-time
+npm run pm2:monit
+```
+
+**Auto-start on boot:**
+
+```bash
+# Generate startup script
+pm2 startup
+
+# Save current PM2 process list
+pm2 save
+```
+
+PM2 configuration is in [ecosystem.config.js](ecosystem.config.js). Logs are stored in `~/.engram/logs/`.
+
 ## Architecture
 
 ### Memory Categories

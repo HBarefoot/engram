@@ -14,7 +14,14 @@
     "build": "cd dashboard && npm run build",
     "test": "vitest",
     "test:run": "vitest run",
-    "lint": "eslint src/"
+    "lint": "eslint src/",
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:stop": "pm2 stop engram",
+    "pm2:restart": "pm2 restart engram",
+    "pm2:delete": "pm2 delete engram",
+    "pm2:logs": "pm2 logs engram",
+    "pm2:status": "pm2 status engram",
+    "pm2:monit": "pm2 monit"
   },
   "keywords": [
     "ai",
