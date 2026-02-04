@@ -1,11 +1,7 @@
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-import { homedir } from 'os';
+const { join } = require('path');
+const { homedir } = require('os');
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-export default {
+module.exports = {
   apps: [
     {
       name: 'engram',
