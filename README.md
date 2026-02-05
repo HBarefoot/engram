@@ -1,601 +1,284 @@
-# Engram
-
-> **Persistent memory for AI agents - SQLite for agent state**
-
-Engram is a production-ready memory system that gives AI agents persistent, searchable memory across conversations. Think of it as SQLite for agent state - simple, fast, and reliable.
+# 🧠 Engram
 
 [![CI](https://github.com/HBarefoot/engram/actions/workflows/ci.yml/badge.svg)](https://github.com/HBarefoot/engram/actions/workflows/ci.yml)
-[![npm version](https://badge.fury.io/js/@hbarefoot%2Fengram.svg)](https://www.npmjs.com/package/@hbarefoot/engram)
-[![npm downloads](https://img.shields.io/npm/dm/@hbarefoot/engram.svg)](https://www.npmjs.com/package/@hbarefoot/engram)
-[![Node.js Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)](https://nodejs.org/)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/@hbarefoot/engram)](https://www.npmjs.com/package/@hbarefoot/engram)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 [![MCP](https://img.shields.io/badge/MCP-compatible-blue)](https://modelcontextprotocol.io)
+
+**Give your AI agents persistent memory. Zero cloud. Zero API keys. Two-minute setup.**
+
+Engram is a local-first memory server that lets AI agents like Claude, Cursor, Cline, and Windsurf remember things across sessions. It runs entirely on your machine — no external services, no data leaving your device, no monthly bills.
+
+```bash
+npm install -g @hbarefoot/engram
+engram start
+```
+
+That's it. Your AI agent now has long-term memory.
+
+---
+
+## Why Engram?
+
+Most AI memory solutions require cloud infrastructure, API keys, and external vector databases. Engram takes a different approach:
+
+| | **Engram** | **Mem0** | **Zep** |
+|---|---|---|---|
+| **Setup time** | 2 minutes | Requires API keys + cloud setup | Requires Docker + API keys |
+| **Dependencies** | None — SQLite + local embeddings | OpenAI API, vector DB (Qdrant/Pinecone) | PostgreSQL, OpenAI API |
+| **Data location** | Your machine only | Cloud (or self-hosted with infra) | Cloud (or self-hosted with infra) |
+| **Cost** | Free forever | Pay per API call | Pay per API call |
+| **Privacy** | Complete — nothing leaves your device | Data sent to external APIs | Data sent to external APIs |
+| **MCP native** | ✅ First-class | ❌ REST only | ❌ REST only |
+
+Engram is built for developers who want AI memory without the overhead.
+
+---
 
 ## Features
 
-- 🧠 **Hybrid Memory Retrieval** - Combines semantic similarity, recency, confidence, and access patterns
-- 🔍 **Full-Text Search** - SQLite FTS5 for fast keyword search
-- 🎯 **Vector Embeddings** - Local embeddings with Xenova/all-MiniLM-L6-v2 (~23MB)
-- 🔐 **Secret Detection** - Automatic detection and redaction of API keys and credentials
-- 🧹 **Auto-Consolidation** - Duplicate detection, contradiction flagging, confidence decay
-- 📊 **Web Dashboard** - Modern React UI for visualizing and managing memories
-- 🔌 **MCP Server** - Model Context Protocol integration for Claude Desktop/Code
-- 🚀 **REST API** - Full-featured HTTP API with CORS support
-- 📦 **Zero Config** - Works out of the box with sensible defaults
+- 🔒 **Fully Local** — SQLite database + local embeddings ([all-MiniLM-L6-v2](https://huggingface.co/Xenova/all-MiniLM-L6-v2), 23 MB). No network calls, ever
+- 🤖 **MCP Native** — First-class Model Context Protocol integration. Works with Claude Desktop, Claude Code, Cline, Cursor, Windsurf, and any MCP client
+- 🔍 **Hybrid Search** — Combines vector similarity with full-text search (FTS5) for accurate recall
+- 🧹 **Smart Deduplication** — Automatically detects and merges similar memories (>0.92 similarity threshold)
+- 📊 **Feedback Loop** — Rate memory usefulness to improve future recall accuracy
+- 🔐 **Secret Detection** — Automatically blocks API keys, passwords, and tokens from being stored
+- ⏰ **Temporal Queries** — Filter memories by time: "last week", "3 days ago", or exact dates
+- 📦 **Namespace Isolation** — Organize memories by project, client, or any scope you need
+- 🌐 **REST API** — Full HTTP API with CORS support for custom integrations
+- 🖥️ **Web Dashboard** — React-based UI for browsing, searching, and managing memories
+- 💾 **Export** — Export memories to Markdown, JSON, or plain text for documentation
+
+---
 
 ## Quick Start
 
-### Installation
+### 1. Install
 
 ```bash
-# Install globally for CLI usage
 npm install -g @hbarefoot/engram
-
-# Or install as a project dependency
-npm install @hbarefoot/engram
 ```
 
-**From source (for development):**
+### 2. Start the server
 
 ```bash
-# Clone the repository
-git clone https://github.com/HBarefoot/engram.git
-cd engram
-
-# Install dependencies
-npm install
-
-# Start the server
-npm start
+engram start
 ```
 
-The REST API will be available at `http://localhost:3838` and the dashboard at `http://localhost:3838`.
+### 3. Connect to your AI agent
 
-### Basic Usage
+Add Engram to your MCP client config:
 
-```bash
-# Store a memory
-engram remember "User prefers Fastify over Express for APIs" --category preference
-
-# Search for memories
-engram recall "What framework does the user prefer?"
-
-# List all memories
-engram list
-
-# Check system status
-engram status
-```
-
-## Usage Modes
-
-### 1. CLI (Command Line Interface)
-
-Perfect for quick interactions and scripting:
-
-```bash
-# Remember something
-engram remember "Project uses PostgreSQL 15" --category fact --entity postgresql
-
-# Search with options
-engram recall "database" --limit 3 --threshold 0.5
-
-# Filter by namespace
-engram list --namespace project-alpha
-
-# Delete a memory
-engram forget <memory-id>
-
-# Run consolidation
-engram consolidate
-
-# View conflicts
-engram conflicts
-```
-
-### 2. MCP Server (Claude Desktop/Code)
-
-Integrate with Claude Desktop or Claude Code.
-
-**✨ Easiest Method: Use the Integration Wizard**
-
-1. Run `npm run dev` to start the dashboard
-2. Open http://localhost:5173 and go to the **Agents** tab
-3. Click **Quick Setup** → **Launch Setup Wizard**
-4. Select your platform and copy the auto-generated configuration
-
-**Alternative: Manual Setup**
-
-**macOS**: Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+**Claude Desktop** (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
 ```json
 {
   "mcpServers": {
     "engram": {
       "command": "engram",
-      "args": [
-        "start",
-        "--mcp-only"
-      ]
+      "args": ["start", "--mcp-only"]
     }
   }
 }
 ```
 
-Note: If installed globally with `npm install -g @hbarefoot/engram`, the `engram` command will be available in your PATH. For local installations, use the full path: `/path/to/project/node_modules/.bin/engram`
-
-**Available MCP Tools:**
-- `engram_remember` - Store a memory
-- `engram_recall` - Search for relevant memories
-- `engram_forget` - Delete a memory
-- `engram_status` - Get system status
-
-See [docs/mcp-setup.md](docs/mcp-setup.md) for detailed configuration.
-
-### 3. REST API
-
-Full HTTP API for programmatic access:
+**Claude Code:**
 
 ```bash
-# Create a memory
-curl -X POST http://localhost:3838/api/memories \
-  -H "Content-Type: application/json" \
-  -d '{
-    "content": "User prefers Svelte for frontend",
-    "category": "preference",
-    "entity": "svelte",
-    "confidence": 0.9
-  }'
-
-# Search memories
-curl -X POST http://localhost:3838/api/memories/search \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "frontend preferences",
-    "limit": 5
-  }'
-
-# Get system status
-curl http://localhost:3838/api/status
-
-# List memories with filters
-curl "http://localhost:3838/api/memories?namespace=default&limit=10"
-
-# Delete a memory
-curl -X DELETE http://localhost:3838/api/memories/<memory-id>
+claude mcp add engram -- engram start --mcp-only
 ```
 
-See [docs/api.md](docs/api.md) for complete API documentation.
-
-### 4. Programmatic Usage (Node.js Library)
-
-Import and use Engram directly in your Node.js applications:
-
-```javascript
-import {
-  initDatabase,
-  createMemory,
-  recallMemories,
-  listMemories,
-  loadConfig,
-  getDatabasePath
-} from '@hbarefoot/engram';
-
-// Initialize database
-const config = loadConfig();
-const db = initDatabase(getDatabasePath(config));
-
-// Create a memory
-const memory = createMemory(db, {
-  content: 'User prefers Fastify over Express for building APIs',
-  category: 'preference',
-  entity: 'fastify',
-  confidence: 0.9,
-  namespace: 'backend-preferences',
-  tags: ['backend', 'nodejs', 'api'],
-  source: 'my-app'
-});
-
-// Search for relevant memories
-const results = await recallMemories(
-  db,
-  'What framework does the user prefer for APIs?',
-  { limit: 5, threshold: 0.3 }
-);
-
-console.log('Found memories:', results);
-
-// List all memories with filters
-const allMemories = listMemories(db, {
-  namespace: 'backend-preferences',
-  category: 'preference',
-  limit: 10
-});
-
-// Clean up
-db.close();
-```
-
-See [examples/basic-usage.js](examples/basic-usage.js) for more examples.
-
-### 5. Web Dashboard
-
-Visual interface for managing memories:
+**Cline / Cursor / Windsurf:** Add the same MCP config to your editor's settings. Engram's built-in Integration Wizard can auto-detect your setup:
 
 ```bash
-npm start
+engram connect
 ```
 
-Then open http://localhost:5173 in your browser.
-
-**Dashboard Features:**
-- 📊 System overview with statistics
-- 📝 Browse and filter memories
-- 🔍 Semantic search with score visualization
-- ➕ Create new memories
-- 🗑️ Delete memories
-- 📈 View category and namespace distributions
-- ⚠️ Detect and resolve conflicts
-- 🔄 Run consolidation
-
-### 6. PM2 Process Manager (Production Service)
-
-Run Engram as a persistent background service using PM2:
-
-```bash
-# Install PM2 globally (if not already installed)
-npm install -g pm2
-
-# Start Engram as a PM2 service
-npm run pm2:start
-
-# Check status
-npm run pm2:status
-
-# View logs
-npm run pm2:logs
-
-# Restart service
-npm run pm2:restart
-
-# Stop service
-npm run pm2:stop
-
-# Remove from PM2
-npm run pm2:delete
-
-# Monitor in real-time
-npm run pm2:monit
-```
-
-**Auto-start on boot:**
-
-```bash
-# Generate startup script
-pm2 startup
-
-# Save current PM2 process list
-pm2 save
-```
-
-PM2 configuration is in [ecosystem.config.cjs](ecosystem.config.cjs). Logs are stored in `~/.engram/logs/`.
-
-## Architecture
-
-### Memory Categories
-
-Engram organizes memories into five categories:
-
-- **preference** - User likes/dislikes ("prefers Fastify over Express")
-- **fact** - Objective truth about their setup ("uses PostgreSQL 15")
-- **pattern** - Recurring workflow ("always runs tests before commit")
-- **decision** - Choice they made and why ("chose React for its ecosystem")
-- **outcome** - Result of an action ("deployment succeeded after fixing port")
-
-### Hybrid Recall Algorithm
-
-Memories are ranked using a weighted formula:
-
-```
-score = (similarity × 0.5) + (recency × 0.15) + (confidence × 0.2) + (access × 0.05) + fts_boost
-```
-
-- **Similarity**: Cosine similarity of embeddings (0-1)
-- **Recency**: Time-based decay using last access time
-- **Confidence**: User-specified or auto-calculated confidence (0-1)
-- **Access**: Normalized access count (0-1, capped at 10 accesses)
-- **FTS Boost**: +0.1 if found via full-text search
-
-### Database Schema
-
-```sql
-CREATE TABLE memories (
-  id TEXT PRIMARY KEY,
-  content TEXT NOT NULL,
-  entity TEXT,
-  category TEXT DEFAULT 'fact',
-  confidence REAL DEFAULT 0.8,
-  embedding BLOB,
-  source TEXT,
-  namespace TEXT DEFAULT 'default',
-  tags TEXT,  -- JSON array
-  access_count INTEGER DEFAULT 0,
-  decay_rate REAL DEFAULT 0.01,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL,
-  last_accessed INTEGER
-);
-
--- FTS5 virtual table for full-text search
-CREATE VIRTUAL TABLE memories_fts USING fts5(
-  content, entity, category, namespace,
-  content='memories', content_rowid='rowid'
-);
-```
-
-## Configuration
-
-Engram uses a YAML configuration file at `~/.engram/config.yml`:
-
-```yaml
-dataDir: ~/.engram
-port: 3838
-
-defaults:
-  namespace: default
-  recallLimit: 5
-  confidenceThreshold: 0.3
-
-security:
-  secretDetection: true
-
-consolidation:
-  duplicateThreshold: 0.92
-  decayEnabled: true
-  staleCleanupDays: 90
-```
-
-## Advanced Features
-
-### Secret Detection
-
-Engram automatically detects and redacts common secrets:
-
-- OpenAI API keys (`sk-...`)
-- Stripe keys (`pk_...`, `sk_live_...`)
-- AWS keys (`AKIA...`)
-- GitHub tokens (`ghp_...`, `gho_...`)
-- Slack tokens (`xoxb-...`, `xoxp-...`)
-- Google API keys (`AIza...`)
-- Private keys (`BEGIN PRIVATE KEY`)
-- Database connection strings
-- JWT tokens
-
-### Consolidation
-
-Run periodic consolidation to maintain memory quality:
-
-```bash
-node bin/engram.js consolidate
-```
-
-**What it does:**
-- Removes duplicate memories (>0.92 similarity)
-- Detects contradictions between memories
-- Applies confidence decay to old, unused memories
-- Marks stale memories for review
-
-### Namespaces
-
-Organize memories by project or context:
-
-```bash
-# Create memories in different namespaces
-engram remember "Uses Docker" --namespace project-alpha
-engram remember "Prefers Kubernetes" --namespace project-beta
-
-# Filter by namespace
-engram list --namespace project-alpha
-engram recall "container tech" --namespace project-alpha
-```
-
-## Development
-
-### Project Structure
-
-```
-engram/
-├── bin/
-│   └── engram.js              # CLI entry point
-├── src/
-│   ├── config/
-│   │   └── index.js           # Configuration management
-│   ├── memory/
-│   │   ├── store.js           # SQLite operations
-│   │   ├── recall.js          # Hybrid search
-│   │   └── consolidate.js     # Memory consolidation
-│   ├── embed/
-│   │   └── index.js           # Embedding generation
-│   ├── extract/
-│   │   ├── rules.js           # Category/entity extraction
-│   │   └── secrets.js         # Secret detection
-│   ├── server/
-│   │   ├── mcp.js             # MCP server
-│   │   └── rest.js            # REST API server
-│   └── utils/
-│       ├── id.js              # UUID generation
-│       └── logger.js          # Structured logging
-├── dashboard/                  # React web UI
-├── test/                      # Test suites
-├── docs/                      # Documentation
-└── examples/                  # Usage examples
-```
-
-### Running Tests
-
-```bash
-# Run all tests
-npm test
-
-# Run tests once (no watch)
-npm run test:run
-
-# Run specific test file
-npx vitest test/memory/store.test.js
-```
-
-### Building
-
-```bash
-# No build step required - uses ESM modules directly
-node bin/engram.js start
-```
-
-## API Reference
-
-See [docs/api.md](docs/api.md) for complete REST API documentation.
-
-### Key Endpoints
-
-- `POST /api/memories` - Create memory
-- `GET /api/memories` - List memories
-- `POST /api/memories/search` - Search memories
-- `GET /api/memories/:id` - Get single memory
-- `DELETE /api/memories/:id` - Delete memory
-- `POST /api/consolidate` - Run consolidation
-- `GET /api/conflicts` - Get detected conflicts
-- `GET /api/status` - System status
-- `GET /health` - Health check
-
-## Examples
-
-### Example 1: Project Context Memory
-
-```javascript
-// Store project decisions
-await api.createMemory({
-  content: "Chose Fastify over Express because of better TypeScript support and performance",
-  category: "decision",
-  entity: "fastify",
-  confidence: 1.0,
-  namespace: "project-api",
-  tags: ["backend", "framework"]
-});
-
-// Later, recall why you chose it
-const results = await api.searchMemories("why did we choose Fastify?", {
-  namespace: "project-api",
-  limit: 3
-});
-```
-
-### Example 2: User Preferences
-
-```javascript
-// Store user preferences
-await api.createMemory({
-  content: "User prefers compact code without unnecessary comments",
-  category: "preference",
-  entity: "coding-style",
-  confidence: 0.9
-});
-
-// Recall preferences before generating code
-const prefs = await api.searchMemories("coding style preferences", {
-  category: "preference",
-  limit: 5
-});
-```
-
-### Example 3: Infrastructure Facts
-
-```javascript
-// Document infrastructure
-await api.createMemory({
-  content: "Production database is PostgreSQL 15 on AWS RDS (db.t3.medium)",
-  category: "fact",
-  entity: "postgresql",
-  namespace: "production"
-});
-
-// Quick lookup
-const infra = await api.searchMemories("production database", {
-  namespace: "production"
-});
-```
-
-See [examples/](examples/) directory for more detailed examples.
-
-## Performance
-
-- **Memory Storage**: ~1ms per memory (with embedding)
-- **Recall Search**: ~10-50ms for 5 results (depends on database size)
-- **Database Size**: ~2KB per memory (including embedding)
-- **Embedding Model**: 23MB (downloaded on first use)
-- **Memory Usage**: ~50MB base + loaded model
-
-## Troubleshooting
-
-### Embedding model not downloading
-
-```bash
-# Check internet connection and disk space
-# Model downloads to ~/.engram/models/
-ls -lh ~/.engram/models/
-
-# Manual download if needed
-mkdir -p ~/.engram/models
-# The model will auto-download on first use
-```
-
-### Port already in use
-
-```bash
-# Change the port
-node bin/engram.js start --port 8080
-```
-
-### Database locked
-
-```bash
-# SQLite WAL mode should prevent this, but if it happens:
-# Close all connections and restart
-pkill -f "node bin/engram.js"
-node bin/engram.js start
-```
-
-### Tests failing
-
-```bash
-# Clean test databases
-rm -rf /tmp/engram-*
-
-# Run tests
-npm test
-```
-
-## Contributing
-
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Built with [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) for fast SQLite access
-- Embeddings powered by [@xenova/transformers](https://github.com/xenova/transformers.js)
-- REST API built with [Fastify](https://www.fastify.io/)
-- Dashboard built with [React](https://react.dev/) and [Tailwind CSS](https://tailwindcss.com/)
-- MCP integration via [@modelcontextprotocol/sdk](https://github.com/modelcontextprotocol/sdk)
-
-## Support
-
-- 📖 [Documentation](docs/)
-- 🐛 [Issue Tracker](https://github.com/your-username/engram/issues)
-- 💬 [Discussions](https://github.com/your-username/engram/discussions)
+### 4. Use it
+
+Once connected, your AI agent can store and recall memories naturally:
+
+> **You:** "Remember that our API uses JWT tokens with 24-hour expiry"
+>
+> **Claude:** *stores the memory via `engram_remember`*
+>
+> **You:** (next day) "What authentication approach are we using?"
+>
+> **Claude:** *recalls via `engram_recall`* — "Your API uses JWT tokens with 24-hour expiry."
+
+Memories persist across sessions, restarts, and even different AI clients sharing the same Engram instance.
 
 ---
 
-**Made with ❤️ for the AI agent community**
+## MCP Tools
+
+Engram exposes 6 tools to AI agents via the Model Context Protocol:
+
+| Tool | Description |
+|---|---|
+| `engram_remember` | Store a memory with category, entity, confidence, namespace, and tags |
+| `engram_recall` | Retrieve relevant memories by semantic query with optional filters |
+| `engram_forget` | Delete a specific memory by ID |
+| `engram_feedback` | Rate a memory as helpful or unhelpful to improve future recall |
+| `engram_context` | Generate a pre-formatted context block (markdown/xml/json) with token budget |
+| `engram_status` | Health check with memory count, model status, and configuration info |
+
+### Memory Categories
+
+Memories are organized by type for better retrieval:
+
+- **fact** — Objective truths about setup, architecture, or configuration
+- **preference** — User likes, dislikes, and style choices
+- **pattern** — Recurring workflows and habits
+- **decision** — Choices made and the reasoning behind them
+- **outcome** — Results of actions taken
+
+---
+
+## CLI Reference
+
+```bash
+engram start                    # Start MCP + REST server
+engram start --mcp-only         # MCP server only (for agent integration)
+engram start --port 3838        # Custom port for REST API
+
+engram remember "content"       # Store a memory from the command line
+engram recall "query"           # Search memories
+engram forget <id>              # Delete a memory
+engram list                     # List all memories
+engram status                   # Health check and stats
+
+engram export                   # Export memories to JSON
+engram import <file>            # Import memories from file
+engram consolidate              # Run deduplication and cleanup
+
+engram agents                   # List detected AI agents on your system
+engram connect                  # Interactive setup wizard for MCP clients
+```
+
+---
+
+## REST API
+
+The REST API runs on `http://localhost:3838` by default.
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/health` | GET | Health check |
+| `/api/status` | GET | System status with stats |
+| `/api/memories` | POST | Create a memory |
+| `/api/memories` | GET | List memories (with pagination, category/namespace filters) |
+| `/api/memories/search` | POST | Semantic search |
+| `/api/memories/:id` | GET | Get a single memory |
+| `/api/memories/:id` | DELETE | Delete a memory |
+| `/api/consolidate` | POST | Run deduplication and cleanup |
+| `/api/conflicts` | GET | Get detected memory conflicts |
+
+---
+
+## Web Dashboard
+
+Engram includes a built-in web dashboard at `http://localhost:3838` when running the full server:
+
+- **Dashboard** — Overview of memory stats and recent activity
+- **Memory Browser** — Browse, filter, and manage all stored memories
+- **Search** — Semantic search with similarity scores
+- **Statistics** — Charts and breakdowns by category, namespace, and time
+- **Agents** — Integration hub with a setup wizard for connecting MCP clients
+
+---
+
+## How It Works
+
+1. **Store**: When an AI agent calls `engram_remember`, the memory text is embedded locally using [all-MiniLM-L6-v2](https://huggingface.co/Xenova/all-MiniLM-L6-v2) (a 23 MB model that runs on CPU). The embedding and metadata are stored in a local SQLite database at `~/.engram/memory.db`.
+
+2. **Recall**: When `engram_recall` is called, the query is embedded with the same model and matched against stored memories using cosine similarity. FTS5 keyword matching runs in parallel, and results are merged using a hybrid scoring algorithm.
+
+3. **Deduplicate**: Before storing, Engram checks existing memories for similarity. Exact duplicates (>0.95) are rejected. Near-duplicates (0.92–0.95) are merged intelligently.
+
+4. **Learn**: The `engram_feedback` tool lets agents mark memories as helpful or unhelpful. This adjusts confidence scores and influences future recall ranking.
+
+5. **Protect**: Every memory passes through secret detection before storage. API keys, passwords, tokens, and other sensitive data are automatically blocked.
+
+---
+
+## Configuration
+
+Engram stores its data and config in `~/.engram/`:
+
+```
+~/.engram/
+├── memory.db          # SQLite database (memories + embeddings)
+├── config.json        # Server configuration
+└── models/            # Cached embedding model (~23 MB)
+```
+
+Default settings work out of the box. To customize:
+
+```json
+// ~/.engram/config.json
+{
+  "port": 3838,
+  "defaultNamespace": "default",
+  "recallLimit": 5,
+  "confidenceThreshold": 0.3,
+  "secretDetection": true
+}
+```
+
+---
+
+## Advanced Usage
+
+### Namespace Isolation
+
+Organize memories by project or client:
+
+```bash
+# Store memories in different namespaces
+engram remember "Uses Next.js 14 with app router" --namespace my-saas
+engram remember "WordPress multisite with Redis cache" --namespace client-site
+
+# Recall searches within a namespace
+engram recall "what framework?" --namespace my-saas
+```
+
+AI agents can use namespaces automatically — just include the namespace parameter in `engram_remember` and `engram_recall` calls.
+
+### Temporal Queries
+
+Filter memories by time:
+
+```bash
+engram recall "deployment changes" --after "last week"
+engram recall "API decisions" --after "2025-01-01" --before "2025-06-01"
+```
+
+### Export for Documentation
+
+Export your project's memory as documentation:
+
+```bash
+engram export --format markdown --namespace my-project > PROJECT_CONTEXT.md
+engram export --format json > memories-backup.json
+```
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+
+```bash
+git clone https://github.com/HBarefoot/engram.git
+cd engram
+npm install
+npm run dev
+```
+
+---
+
+## License
+
+MIT © 2026 [HBarefoot](https://github.com/HBarefoot)
