@@ -11,14 +11,24 @@ import { validateContent } from '../src/extract/secrets.js';
 import { extractMemory } from '../src/extract/rules.js';
 import { exportToStatic } from '../src/export/static.js';
 import * as logger from '../src/utils/logger.js';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 import fs from 'fs';
+
+// Read version from package.json
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const packageJson = JSON.parse(
+  readFileSync(join(__dirname, '../package.json'), 'utf-8')
+);
 
 const program = new Command();
 
 program
   .name('engram')
   .description('Persistent memory for AI agents - SQLite for agent state')
-  .version('1.0.0');
+  .version(packageJson.version);
 
 // Start server command
 program

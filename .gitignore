@@ -47,3 +47,4 @@ temp/
 
 # Internal build docs
 engram-build-prompt.md
+*.tgz

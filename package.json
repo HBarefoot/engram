@@ -1,5 +1,5 @@
 {
-  "name": "engram",
+  "name": "@hbarefoot/engram",
   "version": "1.0.0",
   "description": "Persistent memory for AI agents. SQLite for agent state.",
   "type": "module",
@@ -7,11 +7,20 @@
   "bin": {
     "engram": "bin/engram.js"
   },
+  "files": [
+    "bin",
+    "src",
+    "dashboard/dist",
+    "dashboard/package.json",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "start": "node bin/engram.js start",
     "mcp": "node bin/engram.js start --mcp-only",
     "dev": "concurrently \"node bin/engram.js start\" \"cd dashboard && npm run dev\"",
     "build": "cd dashboard && npm run build",
+    "prepublishOnly": "npm run build",
     "test": "vitest",
     "test:run": "vitest run",
     "lint": "eslint src/",

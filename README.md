@@ -4,6 +4,8 @@
 
 Engram is a production-ready memory system that gives AI agents persistent, searchable memory across conversations. Think of it as SQLite for agent state - simple, fast, and reliable.
 
+[![npm version](https://badge.fury.io/js/@hbarefoot%2Fengram.svg)](https://www.npmjs.com/package/@hbarefoot/engram)
+[![npm downloads](https://img.shields.io/npm/dm/@hbarefoot/engram.svg)](https://www.npmjs.com/package/@hbarefoot/engram)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -24,8 +26,18 @@ Engram is a production-ready memory system that gives AI agents persistent, sear
 ### Installation
 
 ```bash
+# Install globally for CLI usage
+npm install -g @hbarefoot/engram
+
+# Or install as a project dependency
+npm install @hbarefoot/engram
+```
+
+**From source (for development):**
+
+```bash
 # Clone the repository
-git clone https://github.com/your-username/engram.git
+git clone https://github.com/HBarefoot/engram.git
 cd engram
 
 # Install dependencies
@@ -35,7 +47,7 @@ npm install
 npm start
 ```
 
-The REST API will be available at `http://localhost:3838` and the dashboard at `http://localhost:5173`.
+The REST API will be available at `http://localhost:3838` and the dashboard at `http://localhost:3838`.
 
 ### Basic Usage
 
@@ -61,22 +73,22 @@ Perfect for quick interactions and scripting:
 
 ```bash
 # Remember something
-node bin/engram.js remember "Project uses PostgreSQL 15" --category fact --entity postgresql
+engram remember "Project uses PostgreSQL 15" --category fact --entity postgresql
 
 # Search with options
-node bin/engram.js recall "database" --limit 3 --threshold 0.5
+engram recall "database" --limit 3 --threshold 0.5
 
 # Filter by namespace
-node bin/engram.js list --namespace project-alpha
+engram list --namespace project-alpha
 
 # Delete a memory
-node bin/engram.js forget <memory-id>
+engram forget <memory-id>
 
 # Run consolidation
-node bin/engram.js consolidate
+engram consolidate
 
 # View conflicts
-node bin/engram.js conflicts
+engram conflicts
 ```
 
 ### 2. MCP Server (Claude Desktop/Code)
@@ -98,9 +110,8 @@ Integrate with Claude Desktop or Claude Code.
 {
   "mcpServers": {
     "engram": {
-      "command": "node",
+      "command": "engram",
       "args": [
-        "/path/to/engram/bin/engram.js",
         "start",
         "--mcp-only"
       ]
@@ -108,6 +119,8 @@ Integrate with Claude Desktop or Claude Code.
   }
 }
 ```
+
+Note: If installed globally with `npm install -g @hbarefoot/engram`, the `engram` command will be available in your PATH. For local installations, use the full path: `/path/to/project/node_modules/.bin/engram`
 
 **Available MCP Tools:**
 - `engram_remember` - Store a memory
@@ -152,7 +165,58 @@ curl -X DELETE http://localhost:3838/api/memories/<memory-id>
 
 See [docs/api.md](docs/api.md) for complete API documentation.
 
-### 4. Web Dashboard
+### 4. Programmatic Usage (Node.js Library)
+
+Import and use Engram directly in your Node.js applications:
+
+```javascript
+import {
+  initDatabase,
+  createMemory,
+  recallMemories,
+  listMemories,
+  loadConfig,
+  getDatabasePath
+} from '@hbarefoot/engram';
+
+// Initialize database
+const config = loadConfig();
+const db = initDatabase(getDatabasePath(config));
+
+// Create a memory
+const memory = createMemory(db, {
+  content: 'User prefers Fastify over Express for building APIs',
+  category: 'preference',
+  entity: 'fastify',
+  confidence: 0.9,
+  namespace: 'backend-preferences',
+  tags: ['backend', 'nodejs', 'api'],
+  source: 'my-app'
+});
+
+// Search for relevant memories
+const results = await recallMemories(
+  db,
+  'What framework does the user prefer for APIs?',
+  { limit: 5, threshold: 0.3 }
+);
+
+console.log('Found memories:', results);
+
+// List all memories with filters
+const allMemories = listMemories(db, {
+  namespace: 'backend-preferences',
+  category: 'preference',
+  limit: 10
+});
+
+// Clean up
+db.close();
+```
+
+See [examples/basic-usage.js](examples/basic-usage.js) for more examples.
+
+### 5. Web Dashboard
 
 Visual interface for managing memories:
 
@@ -172,7 +236,7 @@ Then open http://localhost:5173 in your browser.
 - ⚠️ Detect and resolve conflicts
 - 🔄 Run consolidation
 
-### 5. PM2 Process Manager (Production Service)
+### 6. PM2 Process Manager (Production Service)
 
 Run Engram as a persistent background service using PM2:
 
