@@ -20,7 +20,7 @@ const SECRET_PATTERNS = [
   { pattern: /-----BEGIN PGP PRIVATE KEY BLOCK-----/, name: 'PGP Private Key' },
 
   // Connection Strings with Credentials
-  { pattern: /[a-zA-Z]+:\/\/[^:]+:[^@]+@[^\/]+/, name: 'Connection String with Credentials' },
+  { pattern: /[a-zA-Z]+:\/\/[^:]+:[^@]+@[^/]+/, name: 'Connection String with Credentials' },
   { pattern: /mongodb(\+srv)?:\/\/[^:]+:[^@]+@/, name: 'MongoDB Connection String' },
   { pattern: /postgres(ql)?:\/\/[^:]+:[^@]+@/, name: 'PostgreSQL Connection String' },
   { pattern: /mysql:\/\/[^:]+:[^@]+@/, name: 'MySQL Connection String' },
