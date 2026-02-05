@@ -1,4 +1,7 @@
 import Fastify from 'fastify';
+import fastifyStatic from '@fastify/static';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { loadConfig, getDatabasePath, getModelsPath } from '../config/index.js';
 import { initDatabase, createMemory, getMemory, deleteMemory, listMemories, getStats } from '../memory/store.js';
 import { recallMemories } from '../memory/recall.js';
@@ -7,6 +10,9 @@ import { validateContent } from '../extract/secrets.js';
 import { extractMemory } from '../extract/rules.js';
 import { exportToStatic } from '../export/static.js';
 import * as logger from '../utils/logger.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Create and configure the Fastify REST API server
@@ -463,6 +469,23 @@ export function createRESTServer(config) {
       logger.error('Export error', { error: error.message });
       reply.code(500);
       return { error: error.message };
+    }
+  });
+
+  // Serve dashboard static files
+  const dashboardPath = path.resolve(__dirname, '../../dashboard/dist');
+
+  fastify.register(fastifyStatic, {
+    root: dashboardPath,
+    prefix: '/'
+  });
+
+  // Fallback to index.html for SPA routing
+  fastify.setNotFoundHandler((request, reply) => {
+    if (!request.url.startsWith('/api') && !request.url.startsWith('/health')) {
+      reply.sendFile('index.html');
+    } else {
+      reply.code(404).send({ error: 'Not found' });
     }
   });
 

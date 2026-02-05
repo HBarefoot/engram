@@ -48,8 +48,8 @@ program
       const port = parseInt(options.port);
 
       logger.info('Starting Engram REST API server...');
-      logger.info(`Server will be available at http://localhost:${port}`);
-      logger.warn('Dashboard UI not yet implemented (Phase 5 pending)');
+      logger.info(`Server available at http://localhost:${port}`);
+      logger.info(`Dashboard available at http://localhost:${port}`);
 
       await startRESTServer(config, port);
 
