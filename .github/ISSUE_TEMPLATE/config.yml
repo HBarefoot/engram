@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/HBarefoot/engram/discussions
+    about: Ask questions, share ideas, and discuss with the community
+  - name: 📦 npm Package
+    url: https://www.npmjs.com/package/@hbarefoot/engram
+    about: View the package on npm

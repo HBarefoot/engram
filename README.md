@@ -4,10 +4,12 @@
 
 Engram is a production-ready memory system that gives AI agents persistent, searchable memory across conversations. Think of it as SQLite for agent state - simple, fast, and reliable.
 
+[![CI](https://github.com/HBarefoot/engram/actions/workflows/ci.yml/badge.svg)](https://github.com/HBarefoot/engram/actions/workflows/ci.yml)
 [![npm version](https://badge.fury.io/js/@hbarefoot%2Fengram.svg)](https://www.npmjs.com/package/@hbarefoot/engram)
 [![npm downloads](https://img.shields.io/npm/dm/@hbarefoot/engram.svg)](https://www.npmjs.com/package/@hbarefoot/engram)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![MCP](https://img.shields.io/badge/MCP-compatible-blue)](https://modelcontextprotocol.io)
 
 ## Features
 
