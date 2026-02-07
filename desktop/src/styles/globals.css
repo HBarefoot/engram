@@ -1,0 +1,27 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --surface: 255, 255, 255;
+  --surface-raised: 249, 250, 251;
+  --text-primary: 17, 24, 39;
+  --text-secondary: 107, 114, 128;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: 17, 24, 39;
+    --surface-raised: 31, 41, 55;
+    --text-primary: 249, 250, 251;
+    --text-secondary: 156, 163, 175;
+  }
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background-color: rgba(var(--surface), 1);
+  color: rgba(var(--text-primary), 1);
+}

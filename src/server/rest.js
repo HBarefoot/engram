@@ -193,6 +193,13 @@ export function createRESTServer(config) {
         namespace
       });
 
+      // Get total count for pagination
+      let countQuery = 'SELECT COUNT(*) as count FROM memories WHERE 1=1';
+      const countParams = [];
+      if (namespace) { countQuery += ' AND namespace = ?'; countParams.push(namespace); }
+      if (category) { countQuery += ' AND category = ?'; countParams.push(category); }
+      const totalCount = db.prepare(countQuery).get(...countParams).count;
+
       return {
         success: true,
         memories: memories.map(m => ({
@@ -210,7 +217,7 @@ export function createRESTServer(config) {
         pagination: {
           limit: parseInt(limit),
           offset: parseInt(offset),
-          total: memories.length
+          total: totalCount
         }
       };
     } catch (error) {

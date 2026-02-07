@@ -30,7 +30,11 @@
     "pm2:delete": "pm2 delete engram",
     "pm2:logs": "pm2 logs engram",
     "pm2:status": "pm2 status engram",
-    "pm2:monit": "pm2 monit"
+    "pm2:monit": "pm2 monit",
+    "build:sidecar": "node scripts/build-sidecar.js",
+    "desktop:dev": "cd desktop && npm run tauri dev",
+    "desktop:build": "npm run build:sidecar && cd desktop && npm run tauri build",
+    "desktop:build:universal": "npm run build:sidecar && cd desktop && npm run tauri build -- --target universal-apple-darwin"
   },
   "keywords": [
     "ai",
