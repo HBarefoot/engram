@@ -231,21 +231,24 @@ export default function MemoryList() {
                 >
                   Previous
                 </button>
-                {Array.from({ length: totalPages }, (_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setFilters(f => ({ ...f, offset: i * f.limit }))}
-                    className={`w-8 h-8 text-sm font-medium rounded-md transition-colors ${
-                      currentPage === i
-                        ? 'bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300'
-                        : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                    }`}
-                  >
-                    {i + 1}
-                  </button>
-                )).slice(
-                  Math.max(0, currentPage - 2),
-                  Math.min(totalPages, currentPage + 3)
+                {Array.from(
+                  { length: Math.min(totalPages, currentPage + 3) - Math.max(0, currentPage - 2) },
+                  (_, idx) => {
+                    const i = Math.max(0, currentPage - 2) + idx;
+                    return (
+                      <button
+                        key={i}
+                        onClick={() => setFilters(f => ({ ...f, offset: i * f.limit }))}
+                        className={`w-8 h-8 text-sm font-medium rounded-md transition-colors ${
+                          currentPage === i
+                            ? 'bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300'
+                            : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                        }`}
+                      >
+                        {i + 1}
+                      </button>
+                    );
+                  }
                 )}
                 {currentPage + 3 < totalPages && (
                   <span className="px-1 text-sm text-gray-400">...</span>

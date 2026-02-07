@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
+import { initApiPort } from "./lib/api";
 import Dashboard from "./pages/Dashboard";
 import Onboarding from "./pages/Onboarding";
 import Preferences from "./pages/Preferences";
@@ -28,6 +29,7 @@ export default function App() {
   useEffect(() => {
     async function init() {
       try {
+        await initApiPort();
         const isFirstRun = await invoke<boolean>("check_first_run");
         if (isFirstRun) {
           navigate("/onboarding");

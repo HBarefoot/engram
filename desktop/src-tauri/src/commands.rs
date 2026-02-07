@@ -256,7 +256,8 @@ pub async fn set_start_at_login(enabled: bool) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn export_data() -> Result<String, String> {
+pub async fn export_data(state: State<'_, SidecarState>) -> Result<String, String> {
+    let port = *state.port.lock().await;
     let home = dirs::home_dir().ok_or("Could not determine home directory")?;
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -271,8 +272,9 @@ pub async fn export_data() -> Result<String, String> {
         .build()
         .map_err(|e| e.to_string())?;
 
+    let url = format!("http://localhost:{}/api/memories?limit=10000", port);
     let resp = client
-        .get("http://localhost:3838/api/memories?limit=10000")
+        .get(&url)
         .send()
         .await
         .map_err(|e| format!("Failed to fetch memories: {}", e))?;
@@ -309,8 +311,9 @@ pub async fn restart_sidecar(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn check_health() -> Result<bool, String> {
-    Ok(health_check().await)
+pub async fn check_health(state: State<'_, SidecarState>) -> Result<bool, String> {
+    let port = *state.port.lock().await;
+    Ok(health_check(port).await)
 }
 
 // --- Helper functions ---

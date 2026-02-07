@@ -1,11 +1,10 @@
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { getApiBase } from "../lib/api";
 
 interface QuickAddModalProps {
   onClose: () => void;
 }
-
-const API_BASE = "http://localhost:3838/api";
 
 const CATEGORIES = [
   { value: "preference", label: "Preference" },
@@ -52,7 +51,7 @@ export default function QuickAddModal({ onClose }: QuickAddModalProps) {
         body.entity = entity.trim();
       }
 
-      const res = await fetch(`${API_BASE}/memories`, {
+      const res = await fetch(`${getApiBase()}/memories`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

@@ -7,7 +7,6 @@ use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tokio::time::sleep;
 
 const MAX_RESTART_ATTEMPTS: u32 = 3;
-const HEALTH_CHECK_URL: &str = "http://localhost:3838/api/status";
 const HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(30);
 const STARTUP_GRACE_PERIOD: Duration = Duration::from_secs(5);
 
@@ -35,6 +34,32 @@ impl Default for SidecarState {
             port: Arc::new(Mutex::new(3838)),
         }
     }
+}
+
+/// Try to find the packaged sidecar binary in the app's resource directory.
+fn find_sidecar_binary(app: &AppHandle) -> Option<std::path::PathBuf> {
+    let arch = match std::env::consts::ARCH {
+        "aarch64" => "aarch64-apple-darwin",
+        "x86_64" => "x86_64-apple-darwin",
+        other => other,
+    };
+    let sidecar_name = format!("engram-sidecar-{}", arch);
+
+    // Check the Tauri resource directory (production builds)
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        let candidate = resource_dir.join(&sidecar_name);
+        if candidate.exists() && candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+
+    // Check relative to src-tauri/resources (development)
+    let dev_path = std::path::PathBuf::from("resources").join(&sidecar_name);
+    if dev_path.exists() && dev_path.is_file() {
+        return Some(dev_path);
+    }
+
+    None
 }
 
 /// Find the engram project root by locating bin/engram.js relative to the executable.
@@ -97,16 +122,6 @@ pub fn start_sidecar(app: &AppHandle) -> Result<(), String> {
         *status = SidecarStatus::Starting;
     }
 
-    let engram_root = find_engram_root(app)?;
-    let script_path = engram_root.join("bin").join("engram.js");
-
-    if !script_path.exists() {
-        if let Ok(mut status) = state.status.try_lock() {
-            *status = SidecarStatus::Crashed;
-        }
-        return Err(format!("Engram entry point not found at: {}", script_path.display()));
-    }
-
     let port = state.port.try_lock().map(|p| *p).unwrap_or(3838);
 
     // Check if port is already in use by an existing Engram instance
@@ -122,17 +137,38 @@ pub fn start_sidecar(app: &AppHandle) -> Result<(), String> {
         return Ok(());
     }
 
+    // Try packaged sidecar binary first (production), fall back to node (development)
     let shell = app.shell();
-    let (mut rx, child) = shell
-        .command("node")
-        .args([
-            script_path.to_string_lossy().as_ref(),
-            "start",
-            "--port",
-            &port.to_string(),
-        ])
-        .spawn()
-        .map_err(|e| format!("Failed to spawn engram process: {}", e))?;
+    let (mut rx, child) = if let Some(sidecar_path) = find_sidecar_binary(app) {
+        eprintln!("[engram] Using packaged sidecar binary: {}", sidecar_path.display());
+        shell
+            .command(sidecar_path.to_string_lossy().as_ref())
+            .args(["start", "--port", &port.to_string()])
+            .spawn()
+            .map_err(|e| format!("Failed to spawn sidecar binary: {}", e))?
+    } else {
+        let engram_root = find_engram_root(app)?;
+        let script_path = engram_root.join("bin").join("engram.js");
+
+        if !script_path.exists() {
+            if let Ok(mut status) = state.status.try_lock() {
+                *status = SidecarStatus::Crashed;
+            }
+            return Err(format!("Engram entry point not found at: {}", script_path.display()));
+        }
+
+        eprintln!("[engram] Using node to run: {}", script_path.display());
+        shell
+            .command("node")
+            .args([
+                script_path.to_string_lossy().as_ref(),
+                "start",
+                "--port",
+                &port.to_string(),
+            ])
+            .spawn()
+            .map_err(|e| format!("Failed to spawn engram process: {}", e))?
+    };
 
     if let Ok(mut child_lock) = state.child.try_lock() {
         *child_lock = Some(child);
@@ -204,7 +240,7 @@ pub fn start_sidecar(app: &AppHandle) -> Result<(), String> {
     let app_handle2 = app.clone();
     tauri::async_runtime::spawn(async move {
         sleep(STARTUP_GRACE_PERIOD).await;
-        if health_check().await {
+        if health_check(port).await {
             *status_arc.lock().await = SidecarStatus::Running;
             *restart_count_arc.lock().await = 0;
             eprintln!("[engram] Sidecar started successfully on port {}", port);
@@ -235,7 +271,7 @@ pub async fn stop_sidecar(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-pub async fn health_check() -> bool {
+pub async fn health_check(port: u16) -> bool {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(5))
         .build();
@@ -245,7 +281,8 @@ pub async fn health_check() -> bool {
         Err(_) => return false,
     };
 
-    match client.get(HEALTH_CHECK_URL).send().await {
+    let url = format!("http://localhost:{}/api/status", port);
+    match client.get(&url).send().await {
         Ok(resp) => resp.status().is_success(),
         Err(_) => false,
     }
@@ -274,7 +311,8 @@ pub fn setup_sidecar_lifecycle(app: &AppHandle) {
             let state = app_handle.state::<SidecarState>();
             let status = state.status.lock().await.clone();
 
-            if matches!(status, SidecarStatus::Running) && !health_check().await {
+            let port = *state.port.lock().await;
+            if matches!(status, SidecarStatus::Running) && !health_check(port).await {
                 eprintln!("[engram] Health check failed, requesting restart");
                 *state.status.lock().await = SidecarStatus::Crashed;
                 *state.child.lock().await = None;

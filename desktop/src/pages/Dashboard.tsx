@@ -1,7 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-
-const API_BASE = "http://localhost:3838/api";
+import { getApiBase, getHealthUrl } from "../lib/api";
 
 interface Memory {
   id: string;
@@ -69,7 +68,7 @@ export default function Dashboard() {
 
   const checkHealth = useCallback(async () => {
     try {
-      const res = await fetch("http://localhost:3838/health");
+      const res = await fetch(getHealthUrl());
       setSidecarHealthy(res.ok);
     } catch {
       setSidecarHealthy(false);
@@ -78,7 +77,7 @@ export default function Dashboard() {
 
   const loadStatus = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE}/status`);
+      const res = await fetch(`${getApiBase()}/status`);
       if (!res.ok) throw new Error("Failed to fetch status");
       const data = await res.json();
       setStatus(data);
@@ -96,7 +95,7 @@ export default function Dashboard() {
       if (activeCategory !== "all") {
         params.set("category", activeCategory);
       }
-      const res = await fetch(`${API_BASE}/memories?${params}`);
+      const res = await fetch(`${getApiBase()}/memories?${params}`);
       if (!res.ok) throw new Error("Failed to fetch memories");
       const data = await res.json();
       setMemories(data.memories || []);
@@ -113,7 +112,7 @@ export default function Dashboard() {
       return;
     }
     try {
-      const res = await fetch(`${API_BASE}/memories/search`, {
+      const res = await fetch(`${getApiBase()}/memories/search`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query, limit: 20 }),
@@ -129,7 +128,7 @@ export default function Dashboard() {
 
   async function handleDelete(id: string) {
     try {
-      const res = await fetch(`${API_BASE}/memories/${id}`, { method: "DELETE" });
+      const res = await fetch(`${getApiBase()}/memories/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Delete failed");
       setMemories((prev) => prev.filter((m) => m.id !== id));
       setTotalMemories((prev) => Math.max(0, prev - 1));
@@ -371,21 +370,24 @@ export default function Dashboard() {
               >
                 Prev
               </button>
-              {Array.from({ length: totalPages }, (_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setPage(i)}
-                  className={`w-8 h-8 text-xs font-medium rounded-lg transition-colors ${
-                    page === i
-                      ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300"
-                      : "hover:bg-gray-100 dark:hover:bg-gray-800"
-                  }`}
-                >
-                  {i + 1}
-                </button>
-              )).slice(
-                Math.max(0, page - 2),
-                Math.min(totalPages, page + 3)
+              {Array.from(
+                { length: Math.min(totalPages, page + 3) - Math.max(0, page - 2) },
+                (_, idx) => {
+                  const i = Math.max(0, page - 2) + idx;
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => setPage(i)}
+                      className={`w-8 h-8 text-xs font-medium rounded-lg transition-colors ${
+                        page === i
+                          ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300"
+                          : "hover:bg-gray-100 dark:hover:bg-gray-800"
+                      }`}
+                    >
+                      {i + 1}
+                    </button>
+                  );
+                }
               )}
               {page + 3 < totalPages && (
                 <span className="px-1 text-xs" style={{ color: "rgba(var(--text-secondary), 1)" }}>...</span>

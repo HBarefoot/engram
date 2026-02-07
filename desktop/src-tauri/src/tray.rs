@@ -89,8 +89,8 @@ pub fn create_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         .item(&quit)
         .build()?;
 
-    // Load tray icon
-    let icon = Image::from_path("icons/tray-icon.png").unwrap_or_else(|_| {
+    // Load tray icon (embedded at compile time so it works in bundled apps)
+    let icon = Image::from_bytes(include_bytes!("../icons/tray-icon.png")).unwrap_or_else(|_| {
         // Fallback: create a minimal 1x1 RGBA pixel if icon not found
         Image::new_owned(vec![0, 0, 0, 255], 1, 1)
     });

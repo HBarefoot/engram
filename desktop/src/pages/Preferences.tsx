@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
+import { getApiBase } from "../lib/api";
 
 type Tab = "general" | "agents" | "shortcuts" | "storage" | "advanced";
 
@@ -169,7 +170,7 @@ export default function Preferences() {
       let imported = 0;
       for (const mem of memories) {
         try {
-          await fetch("http://localhost:3838/api/memories", {
+          await fetch(`${getApiBase()}/memories`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
