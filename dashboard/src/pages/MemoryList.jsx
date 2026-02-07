@@ -10,9 +10,10 @@ export default function MemoryList() {
   const [filters, setFilters] = useState({
     namespace: '',
     category: '',
-    limit: 50,
+    limit: 20,
     offset: 0
   });
+  const [totalMemories, setTotalMemories] = useState(0);
 
   useEffect(() => {
     loadMemories();
@@ -29,6 +30,7 @@ export default function MemoryList() {
 
       const data = await api.getMemories(params);
       setMemories(data.memories || []);
+      setTotalMemories(data.pagination?.total ?? data.memories?.length ?? 0);
       setError(null);
     } catch (err) {
       setError(err.message);
@@ -209,6 +211,56 @@ export default function MemoryList() {
             ))}
           </ul>
         </div>
+      )}
+
+      {/* Pagination */}
+      {totalMemories > filters.limit && (
+        (() => {
+          const totalPages = Math.ceil(totalMemories / filters.limit);
+          const currentPage = Math.floor(filters.offset / filters.limit);
+          return (
+            <div className="flex items-center justify-between mt-4">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Showing {filters.offset + 1}–{Math.min(filters.offset + filters.limit, totalMemories)} of {totalMemories}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setFilters(f => ({ ...f, offset: Math.max(0, f.offset - f.limit) }))}
+                  disabled={currentPage === 0}
+                  className="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Previous
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setFilters(f => ({ ...f, offset: i * f.limit }))}
+                    className={`w-8 h-8 text-sm font-medium rounded-md transition-colors ${
+                      currentPage === i
+                        ? 'bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300'
+                        : 'hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                    }`}
+                  >
+                    {i + 1}
+                  </button>
+                )).slice(
+                  Math.max(0, currentPage - 2),
+                  Math.min(totalPages, currentPage + 3)
+                )}
+                {currentPage + 3 < totalPages && (
+                  <span className="px-1 text-sm text-gray-400">...</span>
+                )}
+                <button
+                  onClick={() => setFilters(f => ({ ...f, offset: Math.min((totalPages - 1) * f.limit, f.offset + f.limit) }))}
+                  disabled={currentPage >= totalPages - 1}
+                  className="px-3 py-1.5 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          );
+        })()
       )}
 
       {/* Create Memory Modal */}

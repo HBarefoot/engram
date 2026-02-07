@@ -37,6 +37,9 @@ dist/
 build/
 dashboard/dist/
 
+# Rust build artifacts
+desktop/src-tauri/target/
+
 # Models cache
 .engram/models/
 

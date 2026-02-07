@@ -1,0 +1,31 @@
+# Desktop app (distributed separately)
+desktop/
+scripts/
+
+# Build artifacts
+*.dmg
+*.app
+*.zip
+*.tgz
+
+# Development
+.github/
+docs/
+examples/
+*.md
+!README.md
+test/
+coverage/
+.vscode/
+.idea/
+.claude/
+
+# Config
+vitest.config.js
+eslint.config.js
+ecosystem.config.cjs
+engram-build-prompt.md
+
+# OS files
+.DS_Store
+Thumbs.db

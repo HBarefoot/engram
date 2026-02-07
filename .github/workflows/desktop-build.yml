@@ -1,0 +1,105 @@
+name: Build Desktop App
+
+on:
+  push:
+    tags:
+      - "desktop-v*"
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop/src-tauri
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install desktop dependencies
+        run: cd desktop && npm ci
+
+      - name: Build sidecar
+        run: npm run build:sidecar
+
+      - name: Build Tauri app (universal)
+        run: cd desktop && npm run tauri build -- --target universal-apple-darwin
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Engram-macos
+          path: |
+            desktop/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+            desktop/src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app
+
+  release:
+    needs: build-macos
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/desktop-v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Zip the .app bundle
+        run: |
+          cd Engram-macos
+          APP_DIR=$(find . -name "*.app" -type d | head -1)
+          if [ -n "$APP_DIR" ]; then
+            APP_NAME=$(basename "$APP_DIR")
+            zip -r "Engram_${{ steps.version.outputs.version }}_universal.app.zip" "$APP_DIR"
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Engram Desktop v${{ steps.version.outputs.version }}
+          files: |
+            Engram-macos/*.dmg
+            Engram-macos/*.app.zip
+          draft: false
+          generate_release_notes: true
+          body: |
+            ## Installation (macOS)
+
+            Engram Desktop runs on both Apple Silicon (M1/M2/M3/M4) and Intel Macs.
+
+            ### Option 1: DMG Installer
+            1. Download `Engram_${{ steps.version.outputs.version }}_universal.dmg` below
+            2. Open the DMG and drag **Engram** to your Applications folder
+            3. **First launch:** Right-click the app → **Open** → Click **Open** in the dialog
+               _(This is only needed once — macOS remembers your choice)_
+
+            ### Option 2: Direct .app Download
+            1. Download `Engram_${{ steps.version.outputs.version }}_universal.app.zip` below
+            2. Unzip and move **Engram.app** to your Applications folder
+            3. Follow the same first-launch step above
+
+            ### Why the extra step?
+            This app is not yet signed with an Apple Developer certificate. macOS Gatekeeper blocks unsigned apps by default. Right-clicking and choosing "Open" tells macOS you trust this app. You only need to do this once.
+
+            **Alternative (Terminal):**
+            ```bash
+            xattr -cr /Applications/Engram.app
+            ```
