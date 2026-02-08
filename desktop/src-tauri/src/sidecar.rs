@@ -36,26 +36,44 @@ impl Default for SidecarState {
     }
 }
 
-/// Try to find the packaged sidecar binary in the app's resource directory.
-fn find_sidecar_binary(app: &AppHandle) -> Option<std::path::PathBuf> {
-    let arch = match std::env::consts::ARCH {
+/// Return the Rust target triple suffix for the current architecture.
+fn arch_suffix() -> &'static str {
+    match std::env::consts::ARCH {
         "aarch64" => "aarch64-apple-darwin",
         "x86_64" => "x86_64-apple-darwin",
         other => other,
-    };
-    let sidecar_name = format!("engram-sidecar-{}", arch);
+    }
+}
 
-    // Check the Tauri resource directory (production builds)
+/// Return the onnxruntime arch directory name for the current architecture.
+fn ort_arch() -> &'static str {
+    match std::env::consts::ARCH {
+        "aarch64" => "arm64",
+        "x86_64" => "x64",
+        _ => "arm64",
+    }
+}
+
+/// Find the resources directory containing the bundled sidecar.
+/// Looks for `engram-bundle.cjs` as a marker file.
+fn find_resources_dir(app: &AppHandle) -> Option<std::path::PathBuf> {
+    // Check the Tauri resource directory (production builds).
+    // Tauri's `bundle.resources: ["resources/**/*"]` copies files into
+    // Contents/Resources/resources/, so we check the subdirectory first.
     if let Ok(resource_dir) = app.path().resource_dir() {
-        let candidate = resource_dir.join(&sidecar_name);
-        if candidate.exists() && candidate.is_file() {
-            return Some(candidate);
+        let sub = resource_dir.join("resources");
+        if sub.join("engram-bundle.cjs").exists() {
+            return Some(sub);
+        }
+        // Also check top-level in case resources are flattened
+        if resource_dir.join("engram-bundle.cjs").exists() {
+            return Some(resource_dir);
         }
     }
 
-    // Check relative to src-tauri/resources (development)
-    let dev_path = std::path::PathBuf::from("resources").join(&sidecar_name);
-    if dev_path.exists() && dev_path.is_file() {
+    // Check relative to src-tauri/resources (development with built sidecar)
+    let dev_path = std::path::PathBuf::from("resources");
+    if dev_path.join("engram-bundle.cjs").exists() {
         return Some(dev_path);
     }
 
@@ -137,15 +155,38 @@ pub fn start_sidecar(app: &AppHandle) -> Result<(), String> {
         return Ok(());
     }
 
-    // Try packaged sidecar binary first (production), fall back to node (development)
+    // Try bundled sidecar first (production), fall back to node (development)
     let shell = app.shell();
-    let (mut rx, child) = if let Some(sidecar_path) = find_sidecar_binary(app) {
-        eprintln!("[engram] Using packaged sidecar binary: {}", sidecar_path.display());
+    let (mut rx, child) = if let Some(resources_dir) = find_resources_dir(app) {
+        let node_binary = resources_dir.join(format!("node-{}", arch_suffix()));
+        let bundle = resources_dir.join("engram-bundle.cjs");
+        let node_modules = resources_dir.join("node_modules");
+        let dylib_dir = node_modules
+            .join("onnxruntime-node")
+            .join("bin")
+            .join("napi-v3")
+            .join("darwin")
+            .join(ort_arch());
+
+        // Convert paths to owned Strings to avoid lifetime issues
+        let node_binary_s = node_binary.to_string_lossy().into_owned();
+        let bundle_s = bundle.to_string_lossy().into_owned();
+        let node_modules_s = node_modules.to_string_lossy().into_owned();
+        let dylib_dir_s = dylib_dir.to_string_lossy().into_owned();
+        let port_s = port.to_string();
+
+        eprintln!("[engram] Using bundled sidecar from: {}", resources_dir.display());
+        eprintln!("[engram]   node binary: {}", node_binary_s);
+        eprintln!("[engram]   bundle: {}", bundle_s);
+        eprintln!("[engram]   NODE_PATH: {}", node_modules_s);
+
         shell
-            .command(sidecar_path.to_string_lossy().as_ref())
-            .args(["start", "--port", &port.to_string()])
+            .command(&node_binary_s)
+            .args([bundle_s.as_str(), "start", "--port", &port_s])
+            .env("NODE_PATH", &node_modules_s)
+            .env("DYLD_LIBRARY_PATH", &dylib_dir_s)
             .spawn()
-            .map_err(|e| format!("Failed to spawn sidecar binary: {}", e))?
+            .map_err(|e| format!("Failed to spawn sidecar: {}", e))?
     } else {
         let engram_root = find_engram_root(app)?;
         let script_path = engram_root.join("bin").join("engram.js");
@@ -174,7 +215,7 @@ pub fn start_sidecar(app: &AppHandle) -> Result<(), String> {
         *child_lock = Some(child);
     }
 
-    // Monitor stdout/stderr in background - use std::thread to avoid Send issues
+    // Monitor stdout/stderr in background
     let status_arc = state.status.clone();
     let child_arc = state.child.clone();
     let restart_count_arc = state.restart_count.clone();

@@ -590,7 +590,7 @@ export class EngramMCPServer {
 
 🤖 Embedding Model:
 - Name: ${modelInfo.name}
-- Available: ${modelInfo.available ? 'Yes' : 'No'}
+- Status: ${modelInfo.cached ? 'Ready' : modelInfo.loading ? 'Loading...' : modelInfo.available ? 'Available (not loaded)' : 'Not available'}
 - Cached: ${modelInfo.cached ? 'Yes' : 'No'}
 - Size: ${modelInfo.sizeMB} MB
 - Path: ${modelInfo.path}
