@@ -16,19 +16,25 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
 
-// Read version from package.json
+// Read version from package.json (may not exist when running as bundled sidecar)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-const packageJson = JSON.parse(
-  readFileSync(join(__dirname, '../package.json'), 'utf-8')
-);
+let version = '1.1.0';
+try {
+  const packageJson = JSON.parse(
+    readFileSync(join(__dirname, '../package.json'), 'utf-8')
+  );
+  version = packageJson.version;
+} catch {
+  // Running as bundled sidecar — package.json not available
+}
 
 const program = new Command();
 
 program
   .name('engram')
   .description('Persistent memory for AI agents - SQLite for agent state')
-  .version(packageJson.version);
+  .version(version);
 
 // Start server command
 program
@@ -273,8 +279,8 @@ program
 
         console.log('\n🤖 Embedding Model:');
         console.log(`  Name: ${modelInfo.name}`);
-        console.log(`  Available: ${modelInfo.available ? '✅' : '❌'}`);
-        console.log(`  Cached: ${modelInfo.cached ? '✅' : '❌'}`);
+        const modelStatus = modelInfo.cached ? '✅ Ready' : modelInfo.loading ? '⏳ Loading...' : modelInfo.available ? '✅ Available' : '❌ Not available';
+        console.log(`  Status: ${modelStatus}`);
         console.log(`  Size: ${modelInfo.sizeMB} MB`);
         console.log(`  Path: ${modelInfo.path}`);
       } catch (error) {

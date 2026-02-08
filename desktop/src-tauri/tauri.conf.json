@@ -11,14 +11,17 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["dmg", "app"],
-    "icon": ["icons/icon.png", "icons/icon-512.png", "icons/icon-256.png", "icons/icon-128.png", "icons/icon-32.png"],
+    "targets": ["app"],
+    "icon": ["icons/icon.icns", "icons/icon.png", "icons/icon-512.png", "icons/icon-256.png", "icons/icon-128.png", "icons/icon-32.png"],
     "macOS": {
       "minimumSystemVersion": "10.15"
     },
-    "resources": ["resources/*"]
+    "resources": ["resources/**/*"]
   },
   "app": {
+    "security": {
+      "csp": "default-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src http://localhost:* https://localhost:* ws://localhost:*; img-src 'self' data: blob:; font-src 'self' data:"
+    },
     "withGlobalTauri": true,
     "windows": [
       {

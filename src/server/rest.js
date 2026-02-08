@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { loadConfig, getDatabasePath, getModelsPath } from '../config/index.js';
@@ -64,6 +65,10 @@ export function createRESTServer(config) {
         modelInfo = {
           name: 'unknown',
           available: false,
+          cached: false,
+          loading: false,
+          sizeMB: 0,
+          path: '',
           error: error.message
         };
       }
@@ -79,6 +84,7 @@ export function createRESTServer(config) {
         model: {
           name: modelInfo.name,
           available: modelInfo.available,
+          loading: modelInfo.loading || false,
           cached: modelInfo.cached,
           size: modelInfo.sizeMB,
           path: modelInfo.path
@@ -479,18 +485,23 @@ export function createRESTServer(config) {
     }
   });
 
-  // Serve dashboard static files
+  // Serve dashboard static files (skip if dist dir doesn't exist, e.g. in sidecar bundle)
   const dashboardPath = path.resolve(__dirname, '../../dashboard/dist');
+  const hasDashboard = fs.existsSync(dashboardPath);
 
-  fastify.register(fastifyStatic, {
-    root: dashboardPath,
-    prefix: '/'
-  });
+  if (hasDashboard) {
+    fastify.register(fastifyStatic, {
+      root: dashboardPath,
+      prefix: '/'
+    });
+  } else {
+    logger.warn('Dashboard dist not found, skipping static file serving', { path: dashboardPath });
+  }
 
-  // Fallback to index.html for SPA routing
+  // Fallback to index.html for SPA routing (only when dashboard is available)
   fastify.setNotFoundHandler((request, reply) => {
-    if (!request.url.startsWith('/api') && !request.url.startsWith('/health')) {
-      reply.sendFile('index.html');
+    if (!request.url.startsWith('/api') && !request.url.startsWith('/health') && hasDashboard) {
+      reply.type('text/html').sendFile('index.html');
     } else {
       reply.code(404).send({ error: 'Not found' });
     }
@@ -520,6 +531,21 @@ export async function startRESTServer(config, port = 3838) {
     await fastify.listen({ port, host: '0.0.0.0' });
 
     logger.info('REST API server started', { port, url: `http://localhost:${port}` });
+
+    // Set TRANSFORMERS_CACHE early so isModelAvailable() can find cached models
+    const modelsPath = getModelsPath(config);
+    process.env.TRANSFORMERS_CACHE = modelsPath;
+
+    // Pre-warm embedding pipeline in background so status reports correctly
+    import('../embed/index.js').then(({ initializePipeline }) => {
+      initializePipeline(modelsPath).then(() => {
+        logger.info('Embedding pipeline pre-warmed');
+      }).catch(err => {
+        logger.warn('Embedding pipeline pre-warm failed (will retry on first use)', { error: err.message });
+      });
+    }).catch(err => {
+      logger.warn('Failed to import embedding module for pre-warm', { error: err?.message ?? String(err) });
+    });
 
     return fastify;
   } catch (error) {

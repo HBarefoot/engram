@@ -26,6 +26,7 @@ interface StatusData {
     name: string;
     available: boolean;
     cached: boolean;
+    loading: boolean;
     size: number;
   };
 }
@@ -428,11 +429,11 @@ export default function Dashboard() {
             <div className="flex items-center gap-2">
               <div
                 className={`w-2 h-2 rounded-full ${
-                  status.model.available ? "bg-green-500" : "bg-yellow-500"
+                  status.model.cached ? "bg-green-500" : status.model.loading ? "bg-yellow-500 animate-pulse" : status.model.available ? "bg-blue-500" : "bg-red-500"
                 }`}
               />
               <span className="text-sm">
-                Embedding model: {status.model.available ? "Ready" : "Not loaded"}
+                Embedding model: {status.model.cached ? "Ready" : status.model.loading ? "Loading..." : status.model.available ? "Available" : "Not loaded"}
               </span>
             </div>
           )}
