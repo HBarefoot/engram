@@ -575,6 +575,10 @@ export class EngramMCPServer {
       modelInfo = {
         name: 'unknown',
         available: false,
+        cached: false,
+        loading: false,
+        sizeMB: 0,
+        path: '',
         error: error.message
       };
     }
