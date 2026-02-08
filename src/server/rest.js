@@ -501,9 +501,7 @@ export function createRESTServer(config) {
   // Fallback to index.html for SPA routing (only when dashboard is available)
   fastify.setNotFoundHandler((request, reply) => {
     if (!request.url.startsWith('/api') && !request.url.startsWith('/health') && hasDashboard) {
-      const indexPath = path.join(dashboardPath, 'index.html');
-      const stream = fs.createReadStream(indexPath);
-      reply.type('text/html').send(stream);
+      reply.type('text/html').sendFile('index.html');
     } else {
       reply.code(404).send({ error: 'Not found' });
     }
@@ -545,7 +543,9 @@ export async function startRESTServer(config, port = 3838) {
       }).catch(err => {
         logger.warn('Embedding pipeline pre-warm failed (will retry on first use)', { error: err.message });
       });
-    }).catch(() => {});
+    }).catch(err => {
+      logger.warn('Failed to import embedding module for pre-warm', { error: err?.message ?? String(err) });
+    });
 
     return fastify;
   } catch (error) {

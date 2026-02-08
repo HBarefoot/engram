@@ -11,6 +11,12 @@ const projectRoot = join(__dirname, '..');
 const resourcesDir = join(projectRoot, 'desktop/src-tauri/resources');
 const nodeModulesDir = join(projectRoot, 'node_modules');
 
+// Platform guard — sidecar build currently targets macOS only
+if (process.platform !== 'darwin') {
+  console.error(`Error: build-sidecar.js currently only supports macOS (darwin). Detected: ${process.platform}`);
+  process.exit(1);
+}
+
 // Architecture mapping
 const archSuffix = process.arch === 'arm64' ? 'aarch64-apple-darwin' : 'x86_64-apple-darwin';
 const ortArch = process.arch === 'arm64' ? 'arm64' : 'x64';

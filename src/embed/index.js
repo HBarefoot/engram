@@ -18,6 +18,11 @@ let cachedPipeline = null;
 let pipelineLoading = false;
 
 /**
+ * In-flight initialization promise to prevent concurrent loads
+ */
+let initPromise = null;
+
+/**
  * Model configuration
  */
 const MODEL_CONFIG = {
@@ -32,10 +37,12 @@ const MODEL_SUBDIR = path.join('Xenova', 'all-MiniLM-L6-v2');
 
 /**
  * Build a list of known locations where the embedding model may already be cached.
- * Each entry is the full path to the model subdirectory (e.g. .../Xenova/all-MiniLM-L6-v2).
+ * Each entry uses the Xenova cache layout (e.g. .../Xenova/all-MiniLM-L6-v2).
+ * @param {Object} [options]
+ * @param {boolean} [options.seedable=false] - If true, only return paths with Xenova-compatible layout (safe to cpSync)
  * @returns {string[]} Array of candidate model directory paths
  */
-function getKnownModelSources() {
+function getKnownModelSources({ seedable = false } = {}) {
   const sources = [
     // Bundled alongside sidecar (production .app bundle — __dirname is the resources dir)
     path.resolve(__dirname, 'models', MODEL_SUBDIR),
@@ -43,14 +50,18 @@ function getKnownModelSources() {
     path.resolve(__dirname, '../../node_modules/@xenova/transformers/.cache', MODEL_SUBDIR),
   ];
 
-  const homeDir = process.env.HOME || process.env.USERPROFILE;
-  if (homeDir) {
-    sources.push(path.join(homeDir, '.cache', 'huggingface', 'hub', 'models--Xenova--all-MiniLM-L6-v2'));
-  }
-
   // Check TRANSFORMERS_CACHE env var (set during initializePipeline)
   if (process.env.TRANSFORMERS_CACHE) {
     sources.push(path.join(process.env.TRANSFORMERS_CACHE, MODEL_SUBDIR));
+  }
+
+  // HuggingFace Hub cache uses a different layout (models--Xenova--*/snapshots/*)
+  // so it's only useful for availability detection, not for seeding via cpSync
+  if (!seedable) {
+    const homeDir = process.env.HOME || process.env.USERPROFILE;
+    if (homeDir) {
+      sources.push(path.join(homeDir, '.cache', 'huggingface', 'hub', 'models--Xenova--all-MiniLM-L6-v2'));
+    }
   }
 
   return sources;
@@ -71,7 +82,7 @@ function seedModelCache(modelsPath) {
     }
   } catch { /* continue */ }
 
-  for (const src of getKnownModelSources()) {
+  for (const src of getKnownModelSources({ seedable: true })) {
     try {
       if (fs.existsSync(src) && fs.readdirSync(src).length > 0) {
         logger.info('Seeding model cache', { from: src, to: modelSubdir });
@@ -97,6 +108,22 @@ export async function initializePipeline(modelsPath) {
     return cachedPipeline;
   }
 
+  // If another call is already loading, wait for it instead of starting a second load
+  if (initPromise) {
+    logger.debug('Pipeline init already in progress, waiting...');
+    return initPromise;
+  }
+
+  initPromise = _doInitializePipeline(modelsPath);
+  try {
+    return await initPromise;
+  } finally {
+    initPromise = null;
+  }
+}
+
+/** @private */
+async function _doInitializePipeline(modelsPath) {
   try {
     pipelineLoading = true;
     logger.info('Initializing embedding model', { model: MODEL_CONFIG.name });
