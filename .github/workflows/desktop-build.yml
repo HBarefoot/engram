@@ -40,12 +40,23 @@ jobs:
       - name: Build Tauri app (Apple Silicon)
         run: cd desktop && npm run tauri build -- --target aarch64-apple-darwin
 
-      - name: Upload artifacts
+      - name: Extract version from tag
+        if: startsWith(github.ref, 'refs/tags/')
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/desktop-v}" >> "$GITHUB_OUTPUT"
+
+      - name: Zip the .app bundle (preserving permissions)
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          cd desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos
+          zip -r -y "Engram_${{ steps.version.outputs.version }}_arm64.app.zip" Engram.app
+
+      - name: Upload zip artifact
         uses: actions/upload-artifact@v4
         with:
           name: Engram-macos
           path: |
-            desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app
+            desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.zip
 
   release:
     needs: build-macos
@@ -60,15 +71,6 @@ jobs:
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
-
-      - name: Zip the .app bundle
-        run: |
-          cd Engram-macos
-          APP_DIR=$(find . -name "*.app" -type d | head -1)
-          if [ -n "$APP_DIR" ]; then
-            APP_NAME=$(basename "$APP_DIR")
-            zip -r "Engram_${{ steps.version.outputs.version }}_arm64.app.zip" "$APP_DIR"
-          fi
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
