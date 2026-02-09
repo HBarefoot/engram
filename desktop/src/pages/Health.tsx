@@ -23,6 +23,8 @@ export default function Health() {
   const [error, setError] = useState<string | null>(null);
   const [cleaning, setCleaning] = useState(false);
   const [cleanResult, setCleanResult] = useState<string | null>(null);
+  const [confirmStale, setConfirmStale] = useState(false);
+  const [confirmMerge, setConfirmMerge] = useState(false);
 
   async function loadData() {
     setLoading(true);
@@ -51,35 +53,48 @@ export default function Health() {
     loadData();
   }, []);
 
-  async function handleCleanStale() {
+  function handleCleanStale() {
     if (!stale || stale.items.length === 0) return;
-    if (!confirm(`Delete ${stale.items.length} stale memories? This cannot be undone.`)) return;
-
-    setCleaning(true);
-    try {
-      const ids = stale.items.map((m) => m.id);
-      const result = await api.bulkDeleteMemories(ids);
-      setCleanResult(`Deleted ${result.deleted} stale memories`);
-      loadData();
-    } catch (err) {
-      setCleanResult(`Error: ${err instanceof Error ? err.message : err}`);
-    } finally {
-      setCleaning(false);
+    if (!confirmStale) {
+      setConfirmStale(true);
+      setTimeout(() => setConfirmStale(false), 5000);
+      return;
     }
+    setConfirmStale(false);
+    setCleaning(true);
+    (async () => {
+      try {
+        const ids = stale.items.map((m) => m.id);
+        const result = await api.bulkDeleteMemories(ids);
+        setCleanResult(`Deleted ${result.deleted} stale memories`);
+        loadData();
+      } catch (err) {
+        setCleanResult(`Error: ${err instanceof Error ? err.message : err}`);
+      } finally {
+        setCleaning(false);
+      }
+    })();
   }
 
-  async function handleMergeDuplicates() {
-    if (!confirm("Run consolidation to merge duplicate memories?")) return;
-    setCleaning(true);
-    try {
-      const result = await api.consolidate({ detectDuplicates: true });
-      setCleanResult(`Removed ${result.results?.duplicatesRemoved || 0} duplicates`);
-      loadData();
-    } catch (err) {
-      setCleanResult(`Error: ${err instanceof Error ? err.message : err}`);
-    } finally {
-      setCleaning(false);
+  function handleMergeDuplicates() {
+    if (!confirmMerge) {
+      setConfirmMerge(true);
+      setTimeout(() => setConfirmMerge(false), 5000);
+      return;
     }
+    setConfirmMerge(false);
+    setCleaning(true);
+    (async () => {
+      try {
+        const result = await api.consolidate({ detectDuplicates: true });
+        setCleanResult(`Removed ${result.results?.duplicatesRemoved || 0} duplicates`);
+        loadData();
+      } catch (err) {
+        setCleanResult(`Error: ${err instanceof Error ? err.message : err}`);
+      } finally {
+        setCleaning(false);
+      }
+    })();
   }
 
   if (loading) {
@@ -189,14 +204,14 @@ export default function Health() {
             disabled={cleaning || !stale?.count}
             className="px-4 py-2 text-sm font-medium rounded-[10px] bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800 dark:hover:bg-yellow-900/40 transition-colors"
           >
-            {cleaning ? "Cleaning..." : `Clean ${stale?.count || 0} stale memories`}
+            {cleaning ? "Cleaning..." : confirmStale ? "Click again to confirm" : `Clean ${stale?.count || 0} stale memories`}
           </button>
           <button
             onClick={handleMergeDuplicates}
             disabled={cleaning || !duplicates?.totalDuplicates}
             className="px-4 py-2 text-sm font-medium rounded-[10px] bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-red-900/20 dark:text-red-300 dark:border-red-800 dark:hover:bg-red-900/40 transition-colors"
           >
-            {cleaning ? "Merging..." : `Merge ${duplicates?.totalDuplicates || 0} duplicates`}
+            {cleaning ? "Merging..." : confirmMerge ? "Click again to confirm" : `Merge ${duplicates?.totalDuplicates || 0} duplicates`}
           </button>
         </div>
         {cleanResult && (
