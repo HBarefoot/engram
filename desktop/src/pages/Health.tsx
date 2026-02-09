@@ -86,7 +86,7 @@ export default function Health() {
     setCleaning(true);
     (async () => {
       try {
-        const result = await api.consolidate({ detectDuplicates: true });
+        const result = await api.consolidate({ detectDuplicates: true, duplicateThreshold: 0.85 });
         setCleanResult(`Removed ${result.results?.duplicatesRemoved || 0} duplicates`);
         loadData();
       } catch (err) {

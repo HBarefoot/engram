@@ -400,14 +400,16 @@ export function createRESTServer(config) {
         detectDuplicates = true,
         detectContradictions = true,
         applyDecay = true,
-        cleanupStale = false
+        cleanupStale = false,
+        duplicateThreshold
       } = request.body || {};
 
       const results = await consolidate(db, {
         detectDuplicates,
         detectContradictions,
         applyDecay,
-        cleanupStale
+        cleanupStale,
+        ...(duplicateThreshold != null && { duplicateThreshold })
       });
 
       logger.info('Consolidation completed via API', results);

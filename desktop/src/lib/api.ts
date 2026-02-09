@@ -92,6 +92,7 @@ export const api = {
     detectContradictions?: boolean;
     applyDecay?: boolean;
     cleanupStale?: boolean;
+    duplicateThreshold?: number;
   } = {}) {
     return fetchJSON<{
       results: {
