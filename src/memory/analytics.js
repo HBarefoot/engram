@@ -171,11 +171,18 @@ export function getDuplicateClusters(db, threshold = 0.85) {
   for (const { a, b, similarity, memA, memB } of pairs) {
     memById.set(a, memA);
     memById.set(b, memB);
-    union(a, b);
 
-    const root = find(a);
-    const existing = clusterSimilarity.get(root) || similarity;
-    clusterSimilarity.set(root, Math.min(existing, similarity));
+    const rootA = find(a);
+    const rootB = find(b);
+    union(a, b);
+    const newRoot = find(a);
+
+    const minSim = Math.min(
+      clusterSimilarity.get(rootA) ?? similarity,
+      clusterSimilarity.get(rootB) ?? similarity,
+      similarity
+    );
+    clusterSimilarity.set(newRoot, minSim);
   }
 
   // Build clusters

@@ -52,8 +52,8 @@ export default function Health() {
   }, []);
 
   async function handleCleanStale() {
-    if (!stale || stale.count === 0) return;
-    if (!confirm(`Delete ${stale.count} stale memories? This cannot be undone.`)) return;
+    if (!stale || stale.items.length === 0) return;
+    if (!confirm(`Delete ${stale.items.length} stale memories? This cannot be undone.`)) return;
 
     setCleaning(true);
     try {

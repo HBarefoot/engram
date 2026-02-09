@@ -440,9 +440,8 @@ export function createRESTServer(config) {
   fastify.get('/api/analytics/overview', async (request, reply) => {
     try {
       const overview = getOverview(db);
-      const { totalDuplicates } = getDuplicateClusters(db);
       const trends = getTrends(db);
-      const healthScore = calculateHealthScore(overview, totalDuplicates, trends);
+      const healthScore = calculateHealthScore(overview, 0, trends);
 
       return { ...overview, healthScore };
     } catch (error) {
