@@ -9,6 +9,7 @@ import Memories from "./pages/Memories";
 import Search from "./pages/Search";
 import Agents from "./pages/Agents";
 import Statistics from "./pages/Statistics";
+import Health from "./pages/Health";
 import Import from "./pages/Import";
 import Onboarding from "./pages/Onboarding";
 import Preferences from "./pages/Preferences";
@@ -111,6 +112,7 @@ export default function App() {
           <Route path="/search" element={<Search />} />
           <Route path="/agents" element={<Agents />} />
           <Route path="/statistics" element={<Statistics />} />
+          <Route path="/health" element={<Health />} />
           <Route path="/import" element={<Import />} />
           <Route path="/preferences" element={<Preferences />} />
           <Route path="/onboarding" element={<Onboarding />} />
