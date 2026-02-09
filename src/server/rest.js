@@ -485,6 +485,101 @@ export function createRESTServer(config) {
     }
   });
 
+  // === Import Wizard Endpoints ===
+
+  // Get available import sources with detection status
+  fastify.get('/api/import/sources', async (request, reply) => {
+    try {
+      const { detectSources } = await import('../import/index.js');
+      const cwd = request.query.cwd || process.cwd();
+      const sources = await detectSources({ cwd });
+
+      return {
+        success: true,
+        sources: sources.map(s => ({
+          id: s.id,
+          name: s.name,
+          label: s.label,
+          description: s.description,
+          category: s.category,
+          detected: s.detected
+        }))
+      };
+    } catch (error) {
+      logger.error('Import sources error', { error: error.message });
+      reply.code(500);
+      return { error: error.message };
+    }
+  });
+
+  // Scan selected sources for memory candidates
+  fastify.post('/api/import/scan', async (request, reply) => {
+    try {
+      const { sources } = request.body;
+
+      if (!sources || !Array.isArray(sources) || sources.length === 0) {
+        reply.code(400);
+        return { error: 'sources array is required' };
+      }
+
+      const { scanSources } = await import('../import/index.js');
+      const result = await scanSources(sources, { cwd: process.cwd() });
+
+      return {
+        success: true,
+        memories: result.memories.map((m, i) => ({
+          _index: i,
+          content: m.content,
+          category: m.category,
+          entity: m.entity,
+          confidence: m.confidence,
+          tags: m.tags,
+          source: m.source
+        })),
+        skipped: result.skipped,
+        warnings: result.warnings,
+        sources: result.sources,
+        duration: result.duration
+      };
+    } catch (error) {
+      logger.error('Import scan error', { error: error.message });
+      reply.code(500);
+      return { error: error.message };
+    }
+  });
+
+  // Commit imported memories
+  fastify.post('/api/import/commit', async (request, reply) => {
+    try {
+      const { memories, namespace } = request.body;
+
+      if (!memories || !Array.isArray(memories) || memories.length === 0) {
+        reply.code(400);
+        return { error: 'memories array is required' };
+      }
+
+      const { commitMemories } = await import('../import/index.js');
+      const result = await commitMemories(db, memories, { namespace });
+
+      return {
+        success: true,
+        results: {
+          total: result.total,
+          created: result.created,
+          duplicates: result.duplicates,
+          merged: result.merged,
+          rejected: result.rejected,
+          errors: result.errors,
+          duration: result.duration
+        }
+      };
+    } catch (error) {
+      logger.error('Import commit error', { error: error.message });
+      reply.code(500);
+      return { error: error.message };
+    }
+  });
+
   // Serve dashboard static files (skip if dist dir doesn't exist, e.g. in sidecar bundle)
   const dashboardPath = path.resolve(__dirname, '../../dashboard/dist');
   const hasDashboard = fs.existsSync(dashboardPath);

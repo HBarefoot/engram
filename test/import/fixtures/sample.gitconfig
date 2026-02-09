@@ -1,0 +1,25 @@
+[user]
+	name = Jane Developer
+	email = jane@example.com
+	signingkey = ABC123
+
+[core]
+	editor = nvim
+	autocrlf = input
+	pager = delta
+
+[alias]
+	co = checkout
+	br = branch
+	ci = commit
+	st = status
+	lg = log --oneline --graph
+
+[init]
+	defaultBranch = main
+
+[merge]
+	tool = vimdiff
+
+[pull]
+	rebase = true
