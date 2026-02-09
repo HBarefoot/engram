@@ -1,0 +1,18 @@
+Host *
+  AddKeysToAgent yes
+  IdentitiesOnly yes
+
+Host production
+  HostName 10.0.1.100
+  User deploy
+  Port 22
+  IdentityFile ~/.ssh/prod_rsa
+
+Host staging
+  HostName staging.example.com
+  User deploy
+
+Host github.com
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/github_ed25519

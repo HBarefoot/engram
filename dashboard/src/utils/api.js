@@ -74,5 +74,32 @@ export const api = {
     const res = await fetch(`${API_BASE}/installation-info`);
     if (!res.ok) throw new Error('Failed to fetch installation info');
     return res.json();
+  },
+
+  // Import wizard endpoints
+  async getImportSources() {
+    const res = await fetch(`${API_BASE}/import/sources`);
+    if (!res.ok) throw new Error('Failed to fetch import sources');
+    return res.json();
+  },
+
+  async scanImportSources(sources) {
+    const res = await fetch(`${API_BASE}/import/scan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sources })
+    });
+    if (!res.ok) throw new Error('Failed to scan import sources');
+    return res.json();
+  },
+
+  async commitImport(memories, namespace) {
+    const res = await fetch(`${API_BASE}/import/commit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ memories, namespace })
+    });
+    if (!res.ok) throw new Error('Failed to commit import');
+    return res.json();
   }
 };

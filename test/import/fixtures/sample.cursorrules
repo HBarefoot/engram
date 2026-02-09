@@ -1,0 +1,15 @@
+# Code Style
+- Always use semicolons in JavaScript
+- Prefer const over let, never use var
+- Use single quotes for strings
+- Maximum line length is 100 characters
+
+# Architecture
+- Use ESM modules exclusively
+- Prefer Fastify over Express for APIs
+- Use Vitest for testing, not Jest
+
+# Naming
+- Use camelCase for variables and functions
+- Use PascalCase for classes and components
+- Prefix private methods with underscore
