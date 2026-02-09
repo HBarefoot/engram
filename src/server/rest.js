@@ -7,6 +7,8 @@ import { loadConfig, getDatabasePath, getModelsPath } from '../config/index.js';
 import { initDatabase, createMemory, getMemory, deleteMemory, listMemories, getStats } from '../memory/store.js';
 import { recallMemories } from '../memory/recall.js';
 import { consolidate, getConflicts } from '../memory/consolidate.js';
+import { getOverview, getStaleMemories, getNeverRecalled, getDuplicateClusters, getTrends } from '../memory/analytics.js';
+import { calculateHealthScore } from '../memory/health.js';
 import { validateContent } from '../extract/secrets.js';
 import { extractMemory } from '../extract/rules.js';
 import { exportToStatic } from '../export/static.js';
@@ -428,6 +430,86 @@ export function createRESTServer(config) {
       };
     } catch (error) {
       logger.error('Get conflicts error', { error: error.message });
+      reply.code(500);
+      return { error: error.message };
+    }
+  });
+
+  // --- Analytics endpoints ---
+
+  fastify.get('/api/analytics/overview', async (request, reply) => {
+    try {
+      const overview = getOverview(db);
+      const trends = getTrends(db);
+      const healthScore = calculateHealthScore(overview, 0, trends);
+
+      return { ...overview, healthScore };
+    } catch (error) {
+      logger.error('Analytics overview error', { error: error.message });
+      reply.code(500);
+      return { error: error.message };
+    }
+  });
+
+  fastify.get('/api/analytics/stale', async (request, reply) => {
+    try {
+      const { days = 30, limit = 50 } = request.query;
+      return getStaleMemories(db, parseInt(days), parseInt(limit));
+    } catch (error) {
+      logger.error('Analytics stale error', { error: error.message });
+      reply.code(500);
+      return { error: error.message };
+    }
+  });
+
+  fastify.get('/api/analytics/never-recalled', async (request, reply) => {
+    try {
+      const { limit = 50 } = request.query;
+      return getNeverRecalled(db, parseInt(limit));
+    } catch (error) {
+      logger.error('Analytics never-recalled error', { error: error.message });
+      reply.code(500);
+      return { error: error.message };
+    }
+  });
+
+  fastify.get('/api/analytics/duplicates', async (request, reply) => {
+    try {
+      return getDuplicateClusters(db);
+    } catch (error) {
+      logger.error('Analytics duplicates error', { error: error.message });
+      reply.code(500);
+      return { error: error.message };
+    }
+  });
+
+  fastify.get('/api/analytics/trends', async (request, reply) => {
+    try {
+      const { days = 30 } = request.query;
+      return getTrends(db, parseInt(days));
+    } catch (error) {
+      logger.error('Analytics trends error', { error: error.message });
+      reply.code(500);
+      return { error: error.message };
+    }
+  });
+
+  fastify.post('/api/memories/bulk-delete', async (request, reply) => {
+    try {
+      const { ids } = request.body;
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        reply.code(400);
+        return { error: 'ids array is required' };
+      }
+
+      let deleted = 0;
+      for (const id of ids) {
+        if (deleteMemory(db, id)) deleted++;
+      }
+
+      return { success: true, deleted };
+    } catch (error) {
+      logger.error('Bulk delete error', { error: error.message });
       reply.code(500);
       return { error: error.message };
     }

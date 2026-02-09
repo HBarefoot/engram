@@ -147,6 +147,34 @@ export const api = {
     });
   },
 
+  async getAnalyticsOverview() {
+    return fetchJSON<AnalyticsOverview>(`${getApiBase()}/analytics/overview`);
+  },
+
+  async getStaleMemories(days = 30, limit = 50) {
+    return fetchJSON<StaleData>(`${getApiBase()}/analytics/stale?days=${days}&limit=${limit}`);
+  },
+
+  async getNeverRecalled(limit = 50) {
+    return fetchJSON<NeverRecalledData>(`${getApiBase()}/analytics/never-recalled?limit=${limit}`);
+  },
+
+  async getDuplicates() {
+    return fetchJSON<DuplicatesData>(`${getApiBase()}/analytics/duplicates`);
+  },
+
+  async getTrends(days = 30) {
+    return fetchJSON<TrendsData>(`${getApiBase()}/analytics/trends?days=${days}`);
+  },
+
+  async bulkDeleteMemories(ids: string[]) {
+    return fetchJSON<{ deleted: number }>(`${getApiBase()}/memories/bulk-delete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+  },
+
   async commitImport(memories: ImportMemory[], namespace?: string) {
     return fetchJSON<{
       results: {
@@ -207,4 +235,61 @@ export interface ImportMemory {
   tags: string[];
   source: string;
   selected?: boolean;
+}
+
+export interface AnalyticsOverview {
+  totalMemories: number;
+  byCategory: Record<string, number>;
+  byNamespace: Record<string, number>;
+  createdLast7Days: number;
+  createdLast30Days: number;
+  avgConfidence: number;
+  recallRate: number;
+  healthScore: number;
+}
+
+export interface StaleItem {
+  id: string;
+  content: string;
+  category: string;
+  lastAccessed: number;
+  daysSinceAccess: number;
+}
+
+export interface StaleData {
+  items: StaleItem[];
+  count: number;
+}
+
+export interface NeverRecalledItem {
+  id: string;
+  content: string;
+  category: string;
+  createdAt: number;
+  daysSinceCreation: number;
+}
+
+export interface NeverRecalledData {
+  items: NeverRecalledItem[];
+  count: number;
+}
+
+export interface DuplicateCluster {
+  memories: Array<{ id: string; content: string; category: string; confidence: number }>;
+  similarity: number;
+}
+
+export interface DuplicatesData {
+  clusters: DuplicateCluster[];
+  totalDuplicates: number;
+}
+
+export interface TrendPoint {
+  date: string;
+  created: number;
+  avgConfidence: number;
+}
+
+export interface TrendsData {
+  daily: TrendPoint[];
 }

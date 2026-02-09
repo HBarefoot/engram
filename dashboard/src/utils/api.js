@@ -98,6 +98,47 @@ export const api = {
     return res.json();
   },
 
+  // Analytics endpoints
+  async getAnalyticsOverview() {
+    const res = await fetch(`${API_BASE}/analytics/overview`);
+    if (!res.ok) throw new Error('Failed to fetch analytics overview');
+    return res.json();
+  },
+
+  async getStaleMemories(days = 30, limit = 50) {
+    const res = await fetch(`${API_BASE}/analytics/stale?days=${days}&limit=${limit}`);
+    if (!res.ok) throw new Error('Failed to fetch stale memories');
+    return res.json();
+  },
+
+  async getNeverRecalled(limit = 50) {
+    const res = await fetch(`${API_BASE}/analytics/never-recalled?limit=${limit}`);
+    if (!res.ok) throw new Error('Failed to fetch never-recalled memories');
+    return res.json();
+  },
+
+  async getDuplicates() {
+    const res = await fetch(`${API_BASE}/analytics/duplicates`);
+    if (!res.ok) throw new Error('Failed to fetch duplicates');
+    return res.json();
+  },
+
+  async getTrends(days = 30) {
+    const res = await fetch(`${API_BASE}/analytics/trends?days=${days}`);
+    if (!res.ok) throw new Error('Failed to fetch trends');
+    return res.json();
+  },
+
+  async bulkDeleteMemories(ids) {
+    const res = await fetch(`${API_BASE}/memories/bulk-delete`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids })
+    });
+    if (!res.ok) throw new Error('Failed to bulk delete memories');
+    return res.json();
+  },
+
   async commitImport(memories, namespace) {
     const res = await fetch(`${API_BASE}/import/commit`, {
       method: 'POST',
