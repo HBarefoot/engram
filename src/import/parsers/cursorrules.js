@@ -69,20 +69,38 @@ export function detect(options = {}) {
 export async function parse(options = {}) {
   const result = { source: 'cursorrules', memories: [], skipped: [], warnings: [] };
 
-  const filePath = options.filePath || (() => {
-    const detected = detect(options);
-    return detected.path;
-  })();
+  // If explicit filePath, parse just that one (backward compat)
+  if (options.filePath) {
+    parseOneCursorrules(options.filePath, result);
+    return result;
+  }
 
-  if (!filePath || !fs.existsSync(filePath)) {
+  const detected = detect(options);
+  if (!detected.found) {
     result.warnings.push('No .cursorrules file found');
     return result;
+  }
+
+  for (const filePath of detected.paths) {
+    parseOneCursorrules(filePath, result);
+  }
+
+  return result;
+}
+
+/**
+ * Parse a single .cursorrules file and accumulate results
+ */
+function parseOneCursorrules(filePath, result) {
+  if (!filePath || !fs.existsSync(filePath)) {
+    result.warnings.push('No .cursorrules file found');
+    return;
   }
 
   const content = fs.readFileSync(filePath, 'utf-8').trim();
   if (!content) {
     result.warnings.push('.cursorrules file is empty');
-    return result;
+    return;
   }
 
   const lines = content.split('\n');
@@ -132,8 +150,6 @@ export async function parse(options = {}) {
   if (currentBlock.length > 0) {
     flushBlock(currentBlock, currentSection, result);
   }
-
-  return result;
 }
 
 /**

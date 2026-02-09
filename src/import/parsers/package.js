@@ -43,20 +43,41 @@ export function detect(options = {}) {
  */
 export async function parse(options = {}) {
   const result = { source: 'package', memories: [], skipped: [], warnings: [] };
-  const cwd = options.cwd || process.cwd();
-  const filePath = options.filePath || path.resolve(cwd, 'package.json');
 
-  if (!fs.existsSync(filePath)) {
+  // If explicit filePath, parse just that one (backward compat)
+  if (options.filePath) {
+    parseOnePackage(options.filePath, result);
+    return result;
+  }
+
+  const detected = detect(options);
+  if (!detected.found) {
     result.warnings.push('No package.json found');
     return result;
+  }
+
+  for (const filePath of detected.paths) {
+    parseOnePackage(filePath, result);
+  }
+
+  return result;
+}
+
+/**
+ * Parse a single package.json file and accumulate results
+ */
+function parseOnePackage(filePath, result) {
+  if (!fs.existsSync(filePath)) {
+    result.warnings.push(`No package.json found at ${filePath}`);
+    return;
   }
 
   let pkg;
   try {
     pkg = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
   } catch {
-    result.warnings.push('Failed to parse package.json');
-    return result;
+    result.warnings.push(`Failed to parse ${filePath}`);
+    return;
   }
 
   // Project name and description
@@ -192,8 +213,6 @@ export async function parse(options = {}) {
       });
     }
   }
-
-  return result;
 }
 
 export const meta = {

@@ -50,14 +50,32 @@ export function detect(options = {}) {
 export async function parse(options = {}) {
   const result = { source: 'env', memories: [], skipped: [], warnings: [] };
 
-  const filePath = options.filePath || (() => {
-    const detected = detect(options);
-    return detected.path;
-  })();
+  // If explicit filePath, parse just that one (backward compat)
+  if (options.filePath) {
+    parseOneEnv(options.filePath, result);
+    return result;
+  }
 
-  if (!filePath || !fs.existsSync(filePath)) {
+  const detected = detect(options);
+  if (!detected.found) {
     result.warnings.push('No .env.example file found');
     return result;
+  }
+
+  for (const filePath of detected.paths) {
+    parseOneEnv(filePath, result);
+  }
+
+  return result;
+}
+
+/**
+ * Parse a single .env.example file and accumulate results
+ */
+function parseOneEnv(filePath, result) {
+  if (!fs.existsSync(filePath)) {
+    result.warnings.push(`No .env.example file found at ${filePath}`);
+    return;
   }
 
   const content = fs.readFileSync(filePath, 'utf-8');
@@ -93,7 +111,7 @@ export async function parse(options = {}) {
 
   if (variables.length === 0) {
     result.warnings.push('.env.example has no variables');
-    return result;
+    return;
   }
 
   // Group variables by prefix for cleaner memories
@@ -141,8 +159,6 @@ export async function parse(options = {}) {
 
   // Security warning
   result.warnings.push('Only variable NAMES were extracted — no values or secrets');
-
-  return result;
 }
 
 export const meta = {

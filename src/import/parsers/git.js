@@ -53,14 +53,32 @@ export function detect(options = {}) {
 export async function parse(options = {}) {
   const result = { source: 'git', memories: [], skipped: [], warnings: [] };
 
-  const filePath = options.filePath || (() => {
-    const detected = detect(options);
-    return detected.path;
-  })();
+  // If explicit filePath, parse just that one (backward compat)
+  if (options.filePath) {
+    parseOneGitconfig(options.filePath, result);
+    return result;
+  }
 
-  if (!filePath || !fs.existsSync(filePath)) {
+  const detected = detect(options);
+  if (!detected.found) {
     result.warnings.push('No .gitconfig found');
     return result;
+  }
+
+  for (const filePath of detected.paths) {
+    parseOneGitconfig(filePath, result);
+  }
+
+  return result;
+}
+
+/**
+ * Parse a single .gitconfig file and accumulate results
+ */
+function parseOneGitconfig(filePath, result) {
+  if (!filePath || !fs.existsSync(filePath)) {
+    result.warnings.push('No .gitconfig found');
+    return;
   }
 
   const content = fs.readFileSync(filePath, 'utf-8');
@@ -173,8 +191,6 @@ export async function parse(options = {}) {
       source: 'import:git'
     });
   }
-
-  return result;
 }
 
 /**

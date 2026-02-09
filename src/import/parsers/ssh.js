@@ -46,26 +46,45 @@ export function detect(options = {}) {
 export async function parse(options = {}) {
   const result = { source: 'ssh', memories: [], skipped: [], warnings: [] };
 
-  const filePath = options.filePath || (() => {
+  // Determine which files to parse
+  let filesToParse;
+  if (options.filePath) {
+    filesToParse = [options.filePath];
+  } else {
     const detected = detect(options);
-    return detected.path;
-  })() || SSH_CONFIG_PATH;
+    filesToParse = detected.paths;
+  }
 
-  if (!fs.existsSync(filePath)) {
+  if (filesToParse.length === 0) {
     result.warnings.push('No ~/.ssh/config found');
     return result;
   }
 
-  const content = fs.readFileSync(filePath, 'utf-8');
-  const hosts = parseSSHConfig(content);
+  // Merge hosts from all config files, dedup by host name
+  const allHosts = [];
+  const seenHostNames = new Set();
 
-  if (hosts.length === 0) {
+  for (const filePath of filesToParse) {
+    if (!fs.existsSync(filePath)) continue;
+
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const hosts = parseSSHConfig(content);
+
+    for (const host of hosts) {
+      if (!seenHostNames.has(host.name)) {
+        seenHostNames.add(host.name);
+        allHosts.push(host);
+      }
+    }
+  }
+
+  if (allHosts.length === 0) {
     result.warnings.push('No SSH hosts found in config');
     return result;
   }
 
   // Filter out wildcard-only hosts
-  const namedHosts = hosts.filter(h => h.name !== '*' && !h.name.includes('*'));
+  const namedHosts = allHosts.filter(h => h.name !== '*' && !h.name.includes('*'));
 
   if (namedHosts.length === 0) {
     result.warnings.push('Only wildcard SSH hosts found');
@@ -98,7 +117,7 @@ export async function parse(options = {}) {
   }
 
   // Warn about skipped sensitive fields
-  const skippedCount = hosts.reduce((sum, h) => sum + (h.identityFile ? 1 : 0), 0);
+  const skippedCount = allHosts.reduce((sum, h) => sum + (h.identityFile ? 1 : 0), 0);
   if (skippedCount > 0) {
     result.warnings.push(`Skipped ${skippedCount} IdentityFile entries (security)`);
   }
