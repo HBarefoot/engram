@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { validateContent } from '../../extract/secrets.js';
 
 const CLAUDE_LOCATIONS = [
@@ -11,43 +12,94 @@ const CLAUDE_LOCATIONS = [
 
 /**
  * Detect if .claude project files exist
+ * @param {Object} [options] - Detection options
+ * @param {string} [options.cwd] - Working directory to scan
+ * @param {string[]} [options.paths] - Additional directories to scan
+ * @returns {{ found: boolean, path: string|null, paths: string[] }}
  */
 export function detect(options = {}) {
   const cwd = options.cwd || process.cwd();
+  const foundPaths = [];
+  const seen = new Set();
 
+  // Check cwd
   for (const loc of CLAUDE_LOCATIONS) {
     const fullPath = path.resolve(cwd, loc);
     if (fs.existsSync(fullPath)) {
-      return { found: true, path: path.resolve(cwd) };
+      const dir = path.resolve(cwd);
+      if (!seen.has(dir)) {
+        seen.add(dir);
+        foundPaths.push(dir);
+      }
+      break;
     }
   }
 
-  return { found: false, path: null };
+  // Always check home directory for user-level .claude
+  const homeDir = os.homedir();
+  for (const loc of CLAUDE_LOCATIONS) {
+    const fullPath = path.resolve(homeDir, loc);
+    if (fs.existsSync(fullPath)) {
+      const dir = path.resolve(homeDir);
+      if (!seen.has(dir)) {
+        seen.add(dir);
+        foundPaths.push(dir);
+      }
+      break;
+    }
+  }
+
+  // Check additional paths
+  if (options.paths && Array.isArray(options.paths)) {
+    for (const extraDir of options.paths) {
+      for (const loc of CLAUDE_LOCATIONS) {
+        const fullPath = path.resolve(extraDir, loc);
+        if (fs.existsSync(fullPath)) {
+          const dir = path.resolve(extraDir);
+          if (!seen.has(dir)) {
+            seen.add(dir);
+            foundPaths.push(dir);
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  return {
+    found: foundPaths.length > 0,
+    path: foundPaths[0] || null,
+    paths: foundPaths
+  };
 }
 
 /**
  * Parse .claude project files into memory candidates
+ * Scans cwd, home directory, and any additional paths
  */
 export async function parse(options = {}) {
   const result = { source: 'claude', memories: [], skipped: [], warnings: [] };
-  const cwd = options.cwd || process.cwd();
+  const detected = detect(options);
+  const dirsToScan = detected.paths.length > 0 ? detected.paths : [options.cwd || process.cwd()];
 
-  // Parse CLAUDE.md
-  const claudeMdPath = path.resolve(cwd, 'CLAUDE.md');
-  if (fs.existsSync(claudeMdPath)) {
-    parseClaudeMd(claudeMdPath, result);
-  }
+  for (const dir of dirsToScan) {
+    // Parse CLAUDE.md
+    const claudeMdPath = path.resolve(dir, 'CLAUDE.md');
+    if (fs.existsSync(claudeMdPath)) {
+      parseClaudeMd(claudeMdPath, result);
+    }
 
-  // Parse .claude/settings.json
-  const settingsPath = path.resolve(cwd, '.claude/settings.json');
-  if (fs.existsSync(settingsPath)) {
-    parseClaudeSettings(settingsPath, result);
-  }
+    // Parse .claude/settings.json
+    const settingsPath = path.resolve(dir, '.claude/settings.json');
+    if (fs.existsSync(settingsPath)) {
+      parseClaudeSettings(settingsPath, result);
+    }
 
-  // Parse .claude/commands directory
-  const commandsPath = path.resolve(cwd, '.claude/commands');
-  if (fs.existsSync(commandsPath) && fs.statSync(commandsPath).isDirectory()) {
-    parseClaudeCommands(commandsPath, result);
+    // Parse .claude/commands directory
+    const commandsPath = path.resolve(dir, '.claude/commands');
+    if (fs.existsSync(commandsPath) && fs.statSync(commandsPath).isDirectory()) {
+      parseClaudeCommands(commandsPath, result);
+    }
   }
 
   if (result.memories.length === 0) {

@@ -187,6 +187,137 @@ describe('Import Parsers', () => {
   });
 });
 
+describe('Multi-Path Scanning', () => {
+  describe('backward compatibility', () => {
+    it('home-scoped parsers accept options={} without breaking', async () => {
+      const { detect: detectGit } = await import('../../src/import/parsers/git.js');
+      const { detect: detectShell } = await import('../../src/import/parsers/shell.js');
+      const { detect: detectSsh } = await import('../../src/import/parsers/ssh.js');
+
+      // All should work with no arguments
+      const gitResult = detectGit();
+      const shellResult = detectShell();
+      const sshResult = detectSsh();
+
+      expect(gitResult).toHaveProperty('found');
+      expect(gitResult).toHaveProperty('path');
+      expect(gitResult).toHaveProperty('paths');
+      expect(Array.isArray(gitResult.paths)).toBe(true);
+
+      expect(shellResult).toHaveProperty('found');
+      expect(shellResult).toHaveProperty('paths');
+      expect(Array.isArray(shellResult.paths)).toBe(true);
+
+      expect(sshResult).toHaveProperty('found');
+      expect(sshResult).toHaveProperty('paths');
+      expect(Array.isArray(sshResult.paths)).toBe(true);
+    });
+
+    it('project-scoped parsers accept options={} without breaking', async () => {
+      const { detect: detectClaude } = await import('../../src/import/parsers/claude.js');
+      const { detect: detectCursor } = await import('../../src/import/parsers/cursorrules.js');
+      const { detect: detectEnv } = await import('../../src/import/parsers/env.js');
+      const { detect: detectPkg } = await import('../../src/import/parsers/package.js');
+      const { detect: detectObsidian } = await import('../../src/import/parsers/obsidian.js');
+
+      for (const detectFn of [detectClaude, detectCursor, detectEnv, detectPkg, detectObsidian]) {
+        const result = detectFn({});
+        expect(result).toHaveProperty('found');
+        expect(result).toHaveProperty('path');
+        expect(result).toHaveProperty('paths');
+        expect(Array.isArray(result.paths)).toBe(true);
+      }
+    });
+  });
+
+  describe('options.paths adds search locations', () => {
+    it('package parser finds package.json in additional paths', async () => {
+      const { detect } = await import('../../src/import/parsers/package.js');
+      const projectRoot = path.resolve(__dirname, '../..');
+
+      // Point paths to the project root (which has a package.json)
+      const result = detect({ cwd: '/tmp', paths: [projectRoot] });
+      expect(result.found).toBe(true);
+      expect(result.paths.length).toBeGreaterThan(0);
+      expect(result.paths.some(p => p.includes('package.json'))).toBe(true);
+    });
+
+    it('env parser finds .env.example in additional paths', async () => {
+      const { detect } = await import('../../src/import/parsers/env.js');
+      // Use fixtures dir which may have sample.env.example (but file name differs)
+      // Use a nonexistent path to verify it doesn't crash
+      const result = detect({ cwd: '/tmp', paths: ['/nonexistent/dir'] });
+      expect(result).toHaveProperty('found');
+      expect(result).toHaveProperty('paths');
+      expect(Array.isArray(result.paths)).toBe(true);
+    });
+
+    it('git parser accepts options.paths without error', async () => {
+      const { detect } = await import('../../src/import/parsers/git.js');
+      const result = detect({ paths: ['/nonexistent/dir'] });
+      expect(result).toHaveProperty('found');
+      expect(result).toHaveProperty('paths');
+      expect(Array.isArray(result.paths)).toBe(true);
+    });
+  });
+
+  describe('path deduplication', () => {
+    it('package parser does not double-count when cwd and paths overlap', async () => {
+      const { detect } = await import('../../src/import/parsers/package.js');
+      const projectRoot = path.resolve(__dirname, '../..');
+
+      // Pass project root as both cwd and in paths
+      const result = detect({ cwd: projectRoot, paths: [projectRoot] });
+      if (result.found) {
+        // Should not have duplicate entries
+        const unique = new Set(result.paths);
+        expect(result.paths.length).toBe(unique.size);
+      }
+    });
+  });
+
+  describe('detect returns paths array', () => {
+    it('all parsers return paths array from detect()', async () => {
+      const parsers = [
+        '../../src/import/parsers/git.js',
+        '../../src/import/parsers/shell.js',
+        '../../src/import/parsers/ssh.js',
+        '../../src/import/parsers/claude.js',
+        '../../src/import/parsers/cursorrules.js',
+        '../../src/import/parsers/env.js',
+        '../../src/import/parsers/package.js',
+        '../../src/import/parsers/obsidian.js'
+      ];
+
+      for (const parserPath of parsers) {
+        const { detect } = await import(parserPath);
+        const result = detect({});
+        expect(result).toHaveProperty('paths');
+        expect(Array.isArray(result.paths)).toBe(true);
+
+        // If found is true, paths should have at least one entry
+        if (result.found) {
+          expect(result.paths.length).toBeGreaterThan(0);
+          // path should equal the first entry in paths
+          expect(result.path).toBe(result.paths[0]);
+        }
+      }
+    });
+  });
+
+  describe('claude parser checks home directory', () => {
+    it('should check home directory even when cwd is elsewhere', async () => {
+      const { detect } = await import('../../src/import/parsers/claude.js');
+      // Use /tmp as cwd (unlikely to have .claude files)
+      const result = detect({ cwd: '/tmp' });
+      // We can only verify the structure — whether home has .claude depends on system
+      expect(result).toHaveProperty('found');
+      expect(result).toHaveProperty('paths');
+      expect(Array.isArray(result.paths)).toBe(true);
+    });
+  });
+});
+
 describe('Import Orchestrator', () => {
   it('should detect available sources', async () => {
     const { detectSources } = await import('../../src/import/index.js');

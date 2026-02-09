@@ -492,7 +492,8 @@ export function createRESTServer(config) {
     try {
       const { detectSources } = await import('../import/index.js');
       const cwd = request.query.cwd || process.cwd();
-      const sources = await detectSources({ cwd });
+      const paths = request.query.paths ? request.query.paths.split(',').map(p => p.trim()).filter(Boolean) : undefined;
+      const sources = await detectSources({ cwd, paths });
 
       return {
         success: true,
@@ -515,7 +516,7 @@ export function createRESTServer(config) {
   // Scan selected sources for memory candidates
   fastify.post('/api/import/scan', async (request, reply) => {
     try {
-      const { sources } = request.body;
+      const { sources, cwd, paths } = request.body;
 
       if (!sources || !Array.isArray(sources) || sources.length === 0) {
         reply.code(400);
@@ -523,7 +524,11 @@ export function createRESTServer(config) {
       }
 
       const { scanSources } = await import('../import/index.js');
-      const result = await scanSources(sources, { cwd: process.cwd() });
+      const scanOptions = { cwd: cwd || process.cwd() };
+      if (paths && Array.isArray(paths)) {
+        scanOptions.paths = paths;
+      }
+      const result = await scanSources(sources, scanOptions);
 
       return {
         success: true,

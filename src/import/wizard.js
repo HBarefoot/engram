@@ -1,4 +1,5 @@
 import { createInterface } from 'readline';
+import os from 'os';
 import { detectSources, scanSources, commitMemories } from './index.js';
 import { initDatabase } from '../memory/store.js';
 import { loadConfig, getDatabasePath } from '../config/index.js';
@@ -16,6 +17,7 @@ import chalk from 'chalk';
  * @param {boolean} [options.dryRun] - Preview without committing
  * @param {string} [options.namespace] - Override namespace
  * @param {string} [options.config] - Config file path
+ * @param {string[]} [options.paths] - Additional directories to scan
  */
 export async function runWizard(options = {}) {
   const config = loadConfig(options.config);
@@ -42,7 +44,9 @@ export async function runWizard(options = {}) {
     // Step 1: Detect available sources
     const spin = spinner('Scanning for sources...');
     spin.start();
-    const sources = await detectSources({ cwd: process.cwd() });
+    const scanOpts = { cwd: process.cwd() };
+    if (options.paths) scanOpts.paths = options.paths;
+    const sources = await detectSources(scanOpts);
     const foundSources = sources.filter(s => s.detected.found);
     const notFoundSources = sources.filter(s => !s.detected.found);
 
@@ -57,13 +61,16 @@ export async function runWizard(options = {}) {
     spin.succeed(`Found ${foundSources.length} source${foundSources.length === 1 ? '' : 's'}`);
     console.log('');
 
-    const srcTable = createTable({ head: ['#', 'Source', 'Description', 'Path'] });
+    const srcTable = createTable({ head: ['#', 'Source', 'Description', 'Path(s)'] });
     foundSources.forEach((s, i) => {
+      const pathsDisplay = s.detected.paths && s.detected.paths.length > 1
+        ? s.detected.paths.map(p => p.replace(os.homedir(), '~')).join(', ')
+        : (s.detected.path || '-').replace(os.homedir(), '~');
       srcTable.push([
         String(i + 1),
         chalk.bold(s.label),
         s.description,
-        chalk.dim(s.detected.path || '-')
+        chalk.dim(pathsDisplay)
       ]);
     });
     console.log(srcTable.toString());
@@ -99,7 +106,7 @@ export async function runWizard(options = {}) {
     console.log('');
     const scanSpin = spinner('Scanning sources...');
     scanSpin.start();
-    const scanResult = await scanSources(selectedIds, { cwd: process.cwd() });
+    const scanResult = await scanSources(selectedIds, scanOpts);
     scanSpin.succeed(`Found ${scanResult.memories.length} memories from ${selectedIds.length} source${selectedIds.length === 1 ? '' : 's'}`);
 
     if (scanResult.skipped.length > 0) {
@@ -205,7 +212,9 @@ async function runNonInteractive(config, options) {
 
   const scanSpin = spinner(`Scanning ${options.source}...`);
   scanSpin.start();
-  const scanResult = await scanSources([options.source], { cwd: process.cwd() });
+  const nonInteractiveOpts = { cwd: process.cwd() };
+  if (options.paths) nonInteractiveOpts.paths = options.paths;
+  const scanResult = await scanSources([options.source], nonInteractiveOpts);
   scanSpin.succeed(`Found ${scanResult.memories.length} memories`);
 
   if (scanResult.warnings.length > 0) {

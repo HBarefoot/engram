@@ -20,16 +20,18 @@ export default function Import() {
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [extraPaths, setExtraPaths] = useState<string[]>([]);
+  const [newPath, setNewPath] = useState("");
 
   useEffect(() => {
     loadSources();
   }, []);
 
-  async function loadSources() {
+  async function loadSources(paths?: string[]) {
     setLoading(true);
     setError(null);
     try {
-      const data = await api.getImportSources();
+      const data = await api.getImportSources(paths ?? extraPaths);
       setSources(data.sources || []);
       const found = (data.sources || []).filter((s) => s.detected?.found).map((s) => s.id);
       setSelectedSources(found);
@@ -38,6 +40,22 @@ export default function Import() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function addPath() {
+    const trimmed = newPath.trim();
+    if (trimmed && !extraPaths.includes(trimmed)) {
+      const updated = [...extraPaths, trimmed];
+      setExtraPaths(updated);
+      setNewPath("");
+      loadSources(updated);
+    }
+  }
+
+  function removePath(p: string) {
+    const updated = extraPaths.filter((ep) => ep !== p);
+    setExtraPaths(updated);
+    loadSources(updated);
   }
 
   function toggleSource(id: string) {
@@ -49,7 +67,7 @@ export default function Import() {
     setLoading(true);
     setError(null);
     try {
-      const data = await api.scanImportSources(selectedSources);
+      const data = await api.scanImportSources(selectedSources, extraPaths);
       setScanResult({ warnings: data.warnings });
       setMemories((data.memories || []).map((m) => ({ ...m, selected: true })));
       setStep(2);
@@ -142,6 +160,39 @@ export default function Import() {
             Sources with a green badge were auto-detected on your system.
           </p>
 
+          {/* Extra paths management */}
+          <div className="mb-4 p-3 border border-gray-200 dark:border-gray-700 rounded-lg" style={{ background: "rgba(var(--bg-secondary), 0.5)" }}>
+            <p className="text-xs font-medium mb-2">Additional scan directories</p>
+            <div className="flex gap-2 mb-2">
+              <input
+                type="text"
+                value={newPath}
+                onChange={(e) => setNewPath(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addPath()}
+                placeholder="e.g. ~/repos/my-project"
+                className="flex-1 text-xs border border-gray-300 dark:border-gray-600 rounded px-2.5 py-1.5 bg-white dark:bg-gray-800"
+                style={{ color: "rgba(var(--text-primary), 1)" }}
+              />
+              <button
+                onClick={addPath}
+                disabled={!newPath.trim()}
+                className="px-3 py-1.5 text-xs bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 transition-colors"
+              >
+                Add
+              </button>
+            </div>
+            {extraPaths.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {extraPaths.map((p) => (
+                  <span key={p} className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded">
+                    {p}
+                    <button onClick={() => removePath(p)} className="text-gray-400 hover:text-red-500">&times;</button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="flex gap-2 mb-4">
             <button
               onClick={() => setSelectedSources(sources.filter((s) => s.detected?.found).map((s) => s.id))}
@@ -185,6 +236,11 @@ export default function Import() {
                       )}
                     </div>
                     <p className="text-xs mt-0.5" style={{ color: "rgba(var(--text-secondary), 1)" }}>{source.description}</p>
+                    {source.detected?.paths && source.detected.paths.length > 1 && (
+                      <p className="text-xs mt-0.5" style={{ color: "rgba(var(--text-secondary), 0.7)" }}>
+                        Found in: {source.detected.paths.join(", ")}
+                      </p>
+                    )}
                   </div>
                 </label>
               ))}
@@ -359,6 +415,8 @@ export default function Import() {
               setScanResult(null);
               setMemories([]);
               setCommitResult(null);
+              setExtraPaths([]);
+              setNewPath("");
             }}
             className="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-[10px] hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >

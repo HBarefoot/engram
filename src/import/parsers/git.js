@@ -10,14 +10,41 @@ const GITCONFIG_LOCATIONS = [
 
 /**
  * Detect if git config exists
+ * @param {Object} [options] - Detection options
+ * @param {string[]} [options.paths] - Additional directories to scan for gitconfig
+ * @returns {{ found: boolean, path: string|null, paths: string[] }}
  */
-export function detect() {
+export function detect(options = {}) {
+  const foundPaths = [];
+  const seen = new Set();
+
   for (const loc of GITCONFIG_LOCATIONS) {
-    if (fs.existsSync(loc)) {
-      return { found: true, path: loc };
+    const resolved = path.resolve(loc);
+    if (!seen.has(resolved) && fs.existsSync(resolved)) {
+      seen.add(resolved);
+      foundPaths.push(resolved);
     }
   }
-  return { found: false, path: null };
+
+  // Check additional paths for gitconfig files
+  if (options.paths && Array.isArray(options.paths)) {
+    for (const dir of options.paths) {
+      for (const name of ['.gitconfig', '.config/git/config']) {
+        const loc = path.join(dir, name);
+        const resolved = path.resolve(loc);
+        if (!seen.has(resolved) && fs.existsSync(resolved)) {
+          seen.add(resolved);
+          foundPaths.push(resolved);
+        }
+      }
+    }
+  }
+
+  return {
+    found: foundPaths.length > 0,
+    path: foundPaths[0] || null,
+    paths: foundPaths
+  };
 }
 
 /**
@@ -27,7 +54,7 @@ export async function parse(options = {}) {
   const result = { source: 'git', memories: [], skipped: [], warnings: [] };
 
   const filePath = options.filePath || (() => {
-    const detected = detect();
+    const detected = detect(options);
     return detected.path;
   })();
 

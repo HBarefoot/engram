@@ -6,11 +6,36 @@ const SSH_CONFIG_PATH = path.join(os.homedir(), '.ssh/config');
 
 /**
  * Detect if SSH config exists
+ * @param {Object} [options] - Detection options
+ * @param {string[]} [options.paths] - Additional directories to scan for SSH config
+ * @returns {{ found: boolean, path: string|null, paths: string[] }}
  */
-export function detect() {
+export function detect(options = {}) {
+  const foundPaths = [];
+  const seen = new Set();
+
+  const resolved = path.resolve(SSH_CONFIG_PATH);
+  if (fs.existsSync(resolved)) {
+    seen.add(resolved);
+    foundPaths.push(resolved);
+  }
+
+  // Check additional paths for SSH config
+  if (options.paths && Array.isArray(options.paths)) {
+    for (const dir of options.paths) {
+      const loc = path.join(dir, '.ssh/config');
+      const r = path.resolve(loc);
+      if (!seen.has(r) && fs.existsSync(r)) {
+        seen.add(r);
+        foundPaths.push(r);
+      }
+    }
+  }
+
   return {
-    found: fs.existsSync(SSH_CONFIG_PATH),
-    path: fs.existsSync(SSH_CONFIG_PATH) ? SSH_CONFIG_PATH : null
+    found: foundPaths.length > 0,
+    path: foundPaths[0] || null,
+    paths: foundPaths
   };
 }
 
@@ -21,7 +46,10 @@ export function detect() {
 export async function parse(options = {}) {
   const result = { source: 'ssh', memories: [], skipped: [], warnings: [] };
 
-  const filePath = options.filePath || SSH_CONFIG_PATH;
+  const filePath = options.filePath || (() => {
+    const detected = detect(options);
+    return detected.path;
+  })() || SSH_CONFIG_PATH;
 
   if (!fs.existsSync(filePath)) {
     result.warnings.push('No ~/.ssh/config found');

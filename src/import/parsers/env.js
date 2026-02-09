@@ -3,19 +3,44 @@ import path from 'path';
 
 /**
  * Detect if .env.example exists
+ * @param {Object} [options] - Detection options
+ * @param {string} [options.cwd] - Working directory to scan
+ * @param {string[]} [options.paths] - Additional directories to scan
+ * @returns {{ found: boolean, path: string|null, paths: string[] }}
  */
 export function detect(options = {}) {
   const candidates = ['.env.example', '.env.sample', '.env.template'];
   const baseDir = options.cwd || process.cwd();
+  const foundPaths = [];
+  const seen = new Set();
 
+  // Check cwd
   for (const name of candidates) {
     const filePath = path.resolve(baseDir, name);
-    if (fs.existsSync(filePath)) {
-      return { found: true, path: filePath };
+    if (!seen.has(filePath) && fs.existsSync(filePath)) {
+      seen.add(filePath);
+      foundPaths.push(filePath);
     }
   }
 
-  return { found: false, path: null };
+  // Check additional paths
+  if (options.paths && Array.isArray(options.paths)) {
+    for (const dir of options.paths) {
+      for (const name of candidates) {
+        const filePath = path.resolve(dir, name);
+        if (!seen.has(filePath) && fs.existsSync(filePath)) {
+          seen.add(filePath);
+          foundPaths.push(filePath);
+        }
+      }
+    }
+  }
+
+  return {
+    found: foundPaths.length > 0,
+    path: foundPaths[0] || null,
+    paths: foundPaths
+  };
 }
 
 /**

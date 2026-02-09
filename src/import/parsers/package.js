@@ -3,11 +3,39 @@ import path from 'path';
 
 /**
  * Detect if package.json exists
+ * @param {Object} [options] - Detection options
+ * @param {string} [options.cwd] - Working directory to scan
+ * @param {string[]} [options.paths] - Additional directories to scan
+ * @returns {{ found: boolean, path: string|null, paths: string[] }}
  */
 export function detect(options = {}) {
   const cwd = options.cwd || process.cwd();
+  const foundPaths = [];
+  const seen = new Set();
+
+  // Check cwd
   const filePath = path.resolve(cwd, 'package.json');
-  return { found: fs.existsSync(filePath), path: fs.existsSync(filePath) ? filePath : null };
+  if (fs.existsSync(filePath)) {
+    seen.add(filePath);
+    foundPaths.push(filePath);
+  }
+
+  // Check additional paths
+  if (options.paths && Array.isArray(options.paths)) {
+    for (const dir of options.paths) {
+      const p = path.resolve(dir, 'package.json');
+      if (!seen.has(p) && fs.existsSync(p)) {
+        seen.add(p);
+        foundPaths.push(p);
+      }
+    }
+  }
+
+  return {
+    found: foundPaths.length > 0,
+    path: foundPaths[0] || null,
+    paths: foundPaths
+  };
 }
 
 /**
