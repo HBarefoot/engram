@@ -6,11 +6,36 @@ const SSH_CONFIG_PATH = path.join(os.homedir(), '.ssh/config');
 
 /**
  * Detect if SSH config exists
+ * @param {Object} [options] - Detection options
+ * @param {string[]} [options.paths] - Additional directories to scan for SSH config
+ * @returns {{ found: boolean, path: string|null, paths: string[] }}
  */
-export function detect() {
+export function detect(options = {}) {
+  const foundPaths = [];
+  const seen = new Set();
+
+  const resolved = path.resolve(SSH_CONFIG_PATH);
+  if (fs.existsSync(resolved)) {
+    seen.add(resolved);
+    foundPaths.push(resolved);
+  }
+
+  // Check additional paths for SSH config
+  if (options.paths && Array.isArray(options.paths)) {
+    for (const dir of options.paths) {
+      const loc = path.join(dir, '.ssh/config');
+      const r = path.resolve(loc);
+      if (!seen.has(r) && fs.existsSync(r)) {
+        seen.add(r);
+        foundPaths.push(r);
+      }
+    }
+  }
+
   return {
-    found: fs.existsSync(SSH_CONFIG_PATH),
-    path: fs.existsSync(SSH_CONFIG_PATH) ? SSH_CONFIG_PATH : null
+    found: foundPaths.length > 0,
+    path: foundPaths[0] || null,
+    paths: foundPaths
   };
 }
 
@@ -21,23 +46,45 @@ export function detect() {
 export async function parse(options = {}) {
   const result = { source: 'ssh', memories: [], skipped: [], warnings: [] };
 
-  const filePath = options.filePath || SSH_CONFIG_PATH;
+  // Determine which files to parse
+  let filesToParse;
+  if (options.filePath) {
+    filesToParse = [options.filePath];
+  } else {
+    const detected = detect(options);
+    filesToParse = detected.paths;
+  }
 
-  if (!fs.existsSync(filePath)) {
+  if (filesToParse.length === 0) {
     result.warnings.push('No ~/.ssh/config found');
     return result;
   }
 
-  const content = fs.readFileSync(filePath, 'utf-8');
-  const hosts = parseSSHConfig(content);
+  // Merge hosts from all config files, dedup by host name
+  const allHosts = [];
+  const seenHostNames = new Set();
 
-  if (hosts.length === 0) {
+  for (const filePath of filesToParse) {
+    if (!fs.existsSync(filePath)) continue;
+
+    const content = fs.readFileSync(filePath, 'utf-8');
+    const hosts = parseSSHConfig(content);
+
+    for (const host of hosts) {
+      if (!seenHostNames.has(host.name)) {
+        seenHostNames.add(host.name);
+        allHosts.push(host);
+      }
+    }
+  }
+
+  if (allHosts.length === 0) {
     result.warnings.push('No SSH hosts found in config');
     return result;
   }
 
   // Filter out wildcard-only hosts
-  const namedHosts = hosts.filter(h => h.name !== '*' && !h.name.includes('*'));
+  const namedHosts = allHosts.filter(h => h.name !== '*' && !h.name.includes('*'));
 
   if (namedHosts.length === 0) {
     result.warnings.push('Only wildcard SSH hosts found');
@@ -70,7 +117,7 @@ export async function parse(options = {}) {
   }
 
   // Warn about skipped sensitive fields
-  const skippedCount = hosts.reduce((sum, h) => sum + (h.identityFile ? 1 : 0), 0);
+  const skippedCount = allHosts.reduce((sum, h) => sum + (h.identityFile ? 1 : 0), 0);
   if (skippedCount > 0) {
     result.warnings.push(`Skipped ${skippedCount} IdentityFile entries (security)`);
   }

@@ -13,17 +13,19 @@ export default function ImportWizard() {
   const [commitResult, setCommitResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [extraPaths, setExtraPaths] = useState([]);
+  const [newPath, setNewPath] = useState('');
 
   // Load sources on mount
   useEffect(() => {
     loadSources();
   }, []);
 
-  async function loadSources() {
+  async function loadSources(paths) {
     setLoading(true);
     setError(null);
     try {
-      const data = await api.getImportSources();
+      const data = await api.getImportSources(paths || extraPaths);
       setSources(data.sources || []);
       // Auto-select found sources
       const found = (data.sources || []).filter(s => s.detected?.found).map(s => s.id);
@@ -33,6 +35,22 @@ export default function ImportWizard() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function addPath() {
+    const trimmed = newPath.trim();
+    if (trimmed && !extraPaths.includes(trimmed)) {
+      const updated = [...extraPaths, trimmed];
+      setExtraPaths(updated);
+      setNewPath('');
+      loadSources(updated);
+    }
+  }
+
+  function removePath(p) {
+    const updated = extraPaths.filter(ep => ep !== p);
+    setExtraPaths(updated);
+    loadSources(updated);
   }
 
   function toggleSource(id) {
@@ -55,7 +73,7 @@ export default function ImportWizard() {
     setLoading(true);
     setError(null);
     try {
-      const data = await api.scanImportSources(selectedSources);
+      const data = await api.scanImportSources(selectedSources, extraPaths);
       setScanResult(data);
       // Initialize editable memories with selection state
       setMemories((data.memories || []).map(m => ({ ...m, selected: true })));
@@ -165,6 +183,38 @@ export default function ImportWizard() {
             Sources with a green badge were auto-detected on your system.
           </p>
 
+          {/* Extra paths management */}
+          <div className="mb-4 p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900">
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Additional scan directories</p>
+            <div className="flex gap-2 mb-2">
+              <input
+                type="text"
+                value={newPath}
+                onChange={(e) => setNewPath(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addPath()}
+                placeholder="e.g. ~/repos/my-project"
+                className="flex-1 text-sm border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400"
+              />
+              <button
+                onClick={addPath}
+                disabled={!newPath.trim()}
+                className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+            {extraPaths.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {extraPaths.map(p => (
+                  <span key={p} className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded">
+                    {p}
+                    <button onClick={() => removePath(p)} className="text-gray-400 hover:text-red-500">&times;</button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="flex gap-2 mb-4">
             <button onClick={selectAll} className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400">
               Select all found
@@ -212,6 +262,11 @@ export default function ImportWizard() {
                       </span>
                     </div>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{source.description}</p>
+                    {source.detected?.paths && source.detected.paths.length > 1 && (
+                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                        Found in: {source.detected.paths.join(', ')}
+                      </p>
+                    )}
                   </div>
                 </label>
               ))}
@@ -393,6 +448,8 @@ export default function ImportWizard() {
                 setScanResult(null);
                 setMemories([]);
                 setCommitResult(null);
+                setExtraPaths([]);
+                setNewPath('');
               }}
               className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
             >

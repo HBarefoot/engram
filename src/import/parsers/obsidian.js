@@ -15,9 +15,24 @@ const VAULT_SEARCH_DIRS = [
 
 /**
  * Detect Obsidian vaults by looking for .obsidian directories
+ * @param {Object} [options] - Detection options
+ * @param {string[]} [options.vaultPaths] - Explicit vault paths to check
+ * @param {string[]} [options.paths] - Additional directories to scan for vaults
+ * @returns {{ found: boolean, path: string|null, paths: string[], vaults: string[] }}
  */
 export function detect(options = {}) {
-  const searchDirs = options.vaultPaths || VAULT_SEARCH_DIRS;
+  const searchDirs = [...(options.vaultPaths || VAULT_SEARCH_DIRS)];
+
+  // Merge additional paths into search dirs
+  if (options.paths && Array.isArray(options.paths)) {
+    for (const dir of options.paths) {
+      const resolved = path.resolve(dir);
+      if (!searchDirs.includes(resolved)) {
+        searchDirs.push(resolved);
+      }
+    }
+  }
+
   const vaults = [];
 
   for (const dir of searchDirs) {
@@ -37,7 +52,7 @@ export function detect(options = {}) {
     }
   }
 
-  return { found: vaults.length > 0, path: vaults[0] || null, vaults };
+  return { found: vaults.length > 0, path: vaults[0] || null, paths: vaults, vaults };
 }
 
 /**

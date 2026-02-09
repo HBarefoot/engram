@@ -122,13 +122,18 @@ export const api = {
   },
 
   // Import wizard endpoints
-  async getImportSources() {
+  async getImportSources(paths?: string[]) {
+    const params = new URLSearchParams();
+    if (paths && paths.length > 0) params.set("paths", paths.join(","));
+    const query = params.toString();
     return fetchJSON<{
       sources: ImportSource[];
-    }>(`${getApiBase()}/import/sources`);
+    }>(`${getApiBase()}/import/sources${query ? `?${query}` : ""}`);
   },
 
-  async scanImportSources(sources: string[]) {
+  async scanImportSources(sources: string[], paths?: string[]) {
+    const body: { sources: string[]; paths?: string[] } = { sources };
+    if (paths && paths.length > 0) body.paths = paths;
     return fetchJSON<{
       memories: ImportMemory[];
       skipped: Array<{ content: string; reason: string }>;
@@ -138,7 +143,7 @@ export const api = {
     }>(`${getApiBase()}/import/scan`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ sources }),
+      body: JSON.stringify(body),
     });
   },
 
@@ -191,7 +196,7 @@ export interface ImportSource {
   label: string;
   description: string;
   category: string;
-  detected: { found: boolean; path: string | null };
+  detected: { found: boolean; path: string | null; paths?: string[] };
 }
 
 export interface ImportMemory {

@@ -15,25 +15,48 @@ const CURSORRULES_LOCATIONS = [
  * Detect if .cursorrules exists
  * @param {Object} options
  * @param {string} [options.cwd] - Working directory to scan
- * @returns {Object} Detection result
+ * @param {string[]} [options.paths] - Additional directories to scan
+ * @returns {{ found: boolean, path: string|null, paths: string[] }}
  */
 export function detect(options = {}) {
   const cwd = options.cwd || process.cwd();
+  const foundPaths = [];
+  const seen = new Set();
 
+  // Check cwd
   for (const loc of CURSORRULES_LOCATIONS) {
     const fullPath = path.resolve(cwd, loc);
-    if (fs.existsSync(fullPath)) {
-      return { found: true, path: fullPath };
+    if (!seen.has(fullPath) && fs.existsSync(fullPath)) {
+      seen.add(fullPath);
+      foundPaths.push(fullPath);
     }
   }
 
-  // Also check home directory
-  const homePath = path.join(os.homedir(), '.cursorrules');
-  if (fs.existsSync(homePath)) {
-    return { found: true, path: homePath };
+  // Check home directory
+  const homePath = path.resolve(os.homedir(), '.cursorrules');
+  if (!seen.has(homePath) && fs.existsSync(homePath)) {
+    seen.add(homePath);
+    foundPaths.push(homePath);
   }
 
-  return { found: false, path: null };
+  // Check additional paths
+  if (options.paths && Array.isArray(options.paths)) {
+    for (const dir of options.paths) {
+      for (const loc of CURSORRULES_LOCATIONS) {
+        const fullPath = path.resolve(dir, loc);
+        if (!seen.has(fullPath) && fs.existsSync(fullPath)) {
+          seen.add(fullPath);
+          foundPaths.push(fullPath);
+        }
+      }
+    }
+  }
+
+  return {
+    found: foundPaths.length > 0,
+    path: foundPaths[0] || null,
+    paths: foundPaths
+  };
 }
 
 /**
@@ -46,20 +69,38 @@ export function detect(options = {}) {
 export async function parse(options = {}) {
   const result = { source: 'cursorrules', memories: [], skipped: [], warnings: [] };
 
-  const filePath = options.filePath || (() => {
-    const detected = detect(options);
-    return detected.path;
-  })();
+  // If explicit filePath, parse just that one (backward compat)
+  if (options.filePath) {
+    parseOneCursorrules(options.filePath, result);
+    return result;
+  }
 
-  if (!filePath || !fs.existsSync(filePath)) {
+  const detected = detect(options);
+  if (!detected.found) {
     result.warnings.push('No .cursorrules file found');
     return result;
+  }
+
+  for (const filePath of detected.paths) {
+    parseOneCursorrules(filePath, result);
+  }
+
+  return result;
+}
+
+/**
+ * Parse a single .cursorrules file and accumulate results
+ */
+function parseOneCursorrules(filePath, result) {
+  if (!filePath || !fs.existsSync(filePath)) {
+    result.warnings.push('No .cursorrules file found');
+    return;
   }
 
   const content = fs.readFileSync(filePath, 'utf-8').trim();
   if (!content) {
     result.warnings.push('.cursorrules file is empty');
-    return result;
+    return;
   }
 
   const lines = content.split('\n');
@@ -109,8 +150,6 @@ export async function parse(options = {}) {
   if (currentBlock.length > 0) {
     flushBlock(currentBlock, currentSection, result);
   }
-
-  return result;
 }
 
 /**

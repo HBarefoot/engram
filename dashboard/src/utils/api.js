@@ -77,17 +77,22 @@ export const api = {
   },
 
   // Import wizard endpoints
-  async getImportSources() {
-    const res = await fetch(`${API_BASE}/import/sources`);
+  async getImportSources(paths) {
+    const params = new URLSearchParams();
+    if (paths && paths.length > 0) params.set('paths', paths.join(','));
+    const query = params.toString();
+    const res = await fetch(`${API_BASE}/import/sources${query ? `?${query}` : ''}`);
     if (!res.ok) throw new Error('Failed to fetch import sources');
     return res.json();
   },
 
-  async scanImportSources(sources) {
+  async scanImportSources(sources, paths) {
+    const body = { sources };
+    if (paths && paths.length > 0) body.paths = paths;
     const res = await fetch(`${API_BASE}/import/scan`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sources })
+      body: JSON.stringify(body)
     });
     if (!res.ok) throw new Error('Failed to scan import sources');
     return res.json();

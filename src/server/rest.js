@@ -13,6 +13,30 @@ import { exportToStatic } from '../export/static.js';
 import * as logger from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
+
+/**
+ * Sanitize and validate a path for import scanning.
+ * Rejects paths with traversal sequences and resolves to absolute.
+ * @param {string} p - Path to validate
+ * @returns {string|null} Resolved absolute path, or null if invalid
+ */
+function sanitizePath(p) {
+  if (typeof p !== 'string' || !p.trim()) return null;
+  const resolved = path.resolve(p.trim());
+  // Reject paths that use traversal sequences in the original input
+  if (p.includes('..')) return null;
+  return resolved;
+}
+
+/**
+ * Validate and sanitize paths array from user input.
+ * @param {string[]} paths - Raw paths from request
+ * @returns {string[]} Sanitized paths (invalid entries removed)
+ */
+function sanitizePaths(paths) {
+  if (!paths || !Array.isArray(paths)) return [];
+  return paths.map(sanitizePath).filter(Boolean);
+}
 const __dirname = path.dirname(__filename);
 
 /**
@@ -491,8 +515,12 @@ export function createRESTServer(config) {
   fastify.get('/api/import/sources', async (request, reply) => {
     try {
       const { detectSources } = await import('../import/index.js');
-      const cwd = request.query.cwd || process.cwd();
-      const sources = await detectSources({ cwd });
+      const rawCwd = request.query.cwd;
+      const cwd = rawCwd ? sanitizePath(rawCwd) || process.cwd() : process.cwd();
+      const paths = request.query.paths
+        ? sanitizePaths(request.query.paths.split(','))
+        : undefined;
+      const sources = await detectSources({ cwd, paths });
 
       return {
         success: true,
@@ -515,7 +543,7 @@ export function createRESTServer(config) {
   // Scan selected sources for memory candidates
   fastify.post('/api/import/scan', async (request, reply) => {
     try {
-      const { sources } = request.body;
+      const { sources, cwd: rawCwd, paths: rawPaths } = request.body;
 
       if (!sources || !Array.isArray(sources) || sources.length === 0) {
         reply.code(400);
@@ -523,7 +551,13 @@ export function createRESTServer(config) {
       }
 
       const { scanSources } = await import('../import/index.js');
-      const result = await scanSources(sources, { cwd: process.cwd() });
+      const cwd = rawCwd ? sanitizePath(rawCwd) || process.cwd() : process.cwd();
+      const scanOptions = { cwd };
+      const sanitized = sanitizePaths(rawPaths);
+      if (sanitized.length > 0) {
+        scanOptions.paths = sanitized;
+      }
+      const result = await scanSources(sources, scanOptions);
 
       return {
         success: true,
@@ -623,7 +657,7 @@ export async function startRESTServer(config, port = 3838) {
   try {
     const fastify = createRESTServer(config);
 
-    await fastify.listen({ port, host: '0.0.0.0' });
+    await fastify.listen({ port, host: '127.0.0.1' });
 
     logger.info('REST API server started', { port, url: `http://localhost:${port}` });
 

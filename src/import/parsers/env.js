@@ -3,19 +3,44 @@ import path from 'path';
 
 /**
  * Detect if .env.example exists
+ * @param {Object} [options] - Detection options
+ * @param {string} [options.cwd] - Working directory to scan
+ * @param {string[]} [options.paths] - Additional directories to scan
+ * @returns {{ found: boolean, path: string|null, paths: string[] }}
  */
 export function detect(options = {}) {
   const candidates = ['.env.example', '.env.sample', '.env.template'];
   const baseDir = options.cwd || process.cwd();
+  const foundPaths = [];
+  const seen = new Set();
 
+  // Check cwd
   for (const name of candidates) {
     const filePath = path.resolve(baseDir, name);
-    if (fs.existsSync(filePath)) {
-      return { found: true, path: filePath };
+    if (!seen.has(filePath) && fs.existsSync(filePath)) {
+      seen.add(filePath);
+      foundPaths.push(filePath);
     }
   }
 
-  return { found: false, path: null };
+  // Check additional paths
+  if (options.paths && Array.isArray(options.paths)) {
+    for (const dir of options.paths) {
+      for (const name of candidates) {
+        const filePath = path.resolve(dir, name);
+        if (!seen.has(filePath) && fs.existsSync(filePath)) {
+          seen.add(filePath);
+          foundPaths.push(filePath);
+        }
+      }
+    }
+  }
+
+  return {
+    found: foundPaths.length > 0,
+    path: foundPaths[0] || null,
+    paths: foundPaths
+  };
 }
 
 /**
@@ -25,14 +50,32 @@ export function detect(options = {}) {
 export async function parse(options = {}) {
   const result = { source: 'env', memories: [], skipped: [], warnings: [] };
 
-  const filePath = options.filePath || (() => {
-    const detected = detect(options);
-    return detected.path;
-  })();
+  // If explicit filePath, parse just that one (backward compat)
+  if (options.filePath) {
+    parseOneEnv(options.filePath, result);
+    return result;
+  }
 
-  if (!filePath || !fs.existsSync(filePath)) {
+  const detected = detect(options);
+  if (!detected.found) {
     result.warnings.push('No .env.example file found');
     return result;
+  }
+
+  for (const filePath of detected.paths) {
+    parseOneEnv(filePath, result);
+  }
+
+  return result;
+}
+
+/**
+ * Parse a single .env.example file and accumulate results
+ */
+function parseOneEnv(filePath, result) {
+  if (!fs.existsSync(filePath)) {
+    result.warnings.push(`No .env.example file found at ${filePath}`);
+    return;
   }
 
   const content = fs.readFileSync(filePath, 'utf-8');
@@ -68,7 +111,7 @@ export async function parse(options = {}) {
 
   if (variables.length === 0) {
     result.warnings.push('.env.example has no variables');
-    return result;
+    return;
   }
 
   // Group variables by prefix for cleaner memories
@@ -116,8 +159,6 @@ export async function parse(options = {}) {
 
   // Security warning
   result.warnings.push('Only variable NAMES were extracted — no values or secrets');
-
-  return result;
 }
 
 export const meta = {

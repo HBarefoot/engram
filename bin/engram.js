@@ -587,14 +587,17 @@ program
   .option('--dry-run', 'Preview without committing')
   .option('-n, --namespace <name>', 'Override namespace for imported memories')
   .option('--config <path>', 'Path to config file')
+  .option('-p, --paths <dirs>', 'Additional directories to scan (comma-separated)')
   .action(async (options) => {
     try {
       const { runWizard } = await import('../src/import/wizard.js');
+      const paths = options.paths ? options.paths.split(',').map(p => p.trim()).filter(Boolean) : undefined;
       await runWizard({
         source: options.source,
         dryRun: options.dryRun,
         namespace: options.namespace,
-        config: options.config
+        config: options.config,
+        paths
       });
     } catch (error) {
       const f = await loadFormat();

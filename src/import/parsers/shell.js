@@ -26,14 +26,41 @@ const SECRET_COMMAND_PATTERNS = [
 
 /**
  * Detect if shell history exists
+ * @param {Object} [options] - Detection options
+ * @param {string[]} [options.paths] - Additional directories to scan for shell history
+ * @returns {{ found: boolean, path: string|null, paths: string[] }}
  */
-export function detect() {
+export function detect(options = {}) {
+  const foundPaths = [];
+  const seen = new Set();
+
   for (const loc of HISTORY_LOCATIONS) {
-    if (fs.existsSync(loc)) {
-      return { found: true, path: loc };
+    const resolved = path.resolve(loc);
+    if (!seen.has(resolved) && fs.existsSync(resolved)) {
+      seen.add(resolved);
+      foundPaths.push(resolved);
     }
   }
-  return { found: false, path: null };
+
+  // Check additional paths for shell history files
+  if (options.paths && Array.isArray(options.paths)) {
+    for (const dir of options.paths) {
+      for (const name of ['.zsh_history', '.bash_history', '.local/share/fish/fish_history']) {
+        const loc = path.join(dir, name);
+        const resolved = path.resolve(loc);
+        if (!seen.has(resolved) && fs.existsSync(resolved)) {
+          seen.add(resolved);
+          foundPaths.push(resolved);
+        }
+      }
+    }
+  }
+
+  return {
+    found: foundPaths.length > 0,
+    path: foundPaths[0] || null,
+    paths: foundPaths
+  };
 }
 
 /**
@@ -42,43 +69,46 @@ export function detect() {
 export async function parse(options = {}) {
   const result = { source: 'shell', memories: [], skipped: [], warnings: [] };
 
-  const filePath = options.filePath || (() => {
-    const detected = detect();
-    return detected.path;
-  })();
+  // Determine which files to parse
+  let filesToParse;
+  if (options.filePath) {
+    filesToParse = [options.filePath];
+  } else {
+    const detected = detect(options);
+    filesToParse = detected.paths;
+  }
 
-  if (!filePath || !fs.existsSync(filePath)) {
+  if (filesToParse.length === 0) {
     result.warnings.push('No shell history found');
     return result;
   }
 
-  const isZsh = filePath.includes('zsh');
-  const isFish = filePath.includes('fish');
-  const raw = fs.readFileSync(filePath, 'utf-8');
-
-  // Extract commands from history
-  const commands = extractCommands(raw, { isZsh, isFish });
-
-  // Count command frequency
+  // Merge commands from all history files
   const frequency = {};
   const baseCommands = {};
 
-  for (const cmd of commands) {
-    // Skip commands with potential secrets
-    if (containsSecret(cmd)) {
-      result.skipped.push({ content: cmd.substring(0, 50), reason: 'Potential secret in command' });
-      continue;
+  for (const filePath of filesToParse) {
+    if (!fs.existsSync(filePath)) continue;
+
+    const isZsh = filePath.includes('zsh');
+    const isFish = filePath.includes('fish');
+    const raw = fs.readFileSync(filePath, 'utf-8');
+    const commands = extractCommands(raw, { isZsh, isFish });
+
+    for (const cmd of commands) {
+      if (containsSecret(cmd)) {
+        result.skipped.push({ content: cmd.substring(0, 50), reason: 'Potential secret in command' });
+        continue;
+      }
+
+      const base = cmd.split(/\s+/)[0];
+      if (!base || base.length < 2) continue;
+
+      baseCommands[base] = (baseCommands[base] || 0) + 1;
+
+      const normalized = normalizeCommand(cmd);
+      frequency[normalized] = (frequency[normalized] || 0) + 1;
     }
-
-    // Get base command (first word)
-    const base = cmd.split(/\s+/)[0];
-    if (!base || base.length < 2) continue;
-
-    baseCommands[base] = (baseCommands[base] || 0) + 1;
-
-    // Track full commands for pattern detection (normalize args)
-    const normalized = normalizeCommand(cmd);
-    frequency[normalized] = (frequency[normalized] || 0) + 1;
   }
 
   // Top base commands (tools the user uses most)
