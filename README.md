@@ -1,4 +1,4 @@
-# <img src="engram-logo.png" alt="Engram" width="32" height="32" style="vertical-align: middle;" /> Engram
+# <img src="https://raw.githubusercontent.com/HBarefoot/engram/main/engram-logo.png" alt="Engram" width="32" height="32" style="vertical-align: middle;" /> Engram
 
 [![CI](https://github.com/HBarefoot/engram/actions/workflows/ci.yml/badge.svg)](https://github.com/HBarefoot/engram/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/@hbarefoot/engram)](https://www.npmjs.com/package/@hbarefoot/engram)
