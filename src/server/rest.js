@@ -42,6 +42,22 @@ function sanitizePaths(paths) {
 const __dirname = path.dirname(__filename);
 
 /**
+ * Get the Engram server version.
+ * In the esbuild sidecar bundle, process.env.ENGRAM_VERSION is replaced at build time.
+ * Otherwise, reads from package.json.
+ * @returns {string}
+ */
+function getServerVersion() {
+  if (process.env.ENGRAM_VERSION) return process.env.ENGRAM_VERSION;
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '../../package.json'), 'utf-8'));
+    return pkg.version;
+  } catch {
+    return 'unknown';
+  }
+}
+
+/**
  * Create and configure the Fastify REST API server
  * @param {Object} config - Engram configuration
  * @returns {Object} Fastify instance
@@ -68,10 +84,13 @@ export function createRESTServer(config) {
     reply.code(204).send();
   });
 
+  const serverVersion = getServerVersion();
+
   // Health check endpoint
   fastify.get('/health', async (request, reply) => {
     return {
       status: 'healthy',
+      version: serverVersion,
       timestamp: new Date().toISOString(),
       uptime: process.uptime()
     };
@@ -101,6 +120,7 @@ export function createRESTServer(config) {
 
       return {
         status: 'ok',
+        version: serverVersion,
         memory: {
           total: stats.total,
           withEmbeddings: stats.withEmbeddings,

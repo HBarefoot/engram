@@ -16,17 +16,19 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import fs from 'fs';
 
-// Read version from package.json (may not exist when running as bundled sidecar)
+// Read version: prefer build-time define, then package.json, then fallback
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-let version = '1.1.0';
-try {
-  const packageJson = JSON.parse(
-    readFileSync(join(__dirname, '../package.json'), 'utf-8')
-  );
-  version = packageJson.version;
-} catch {
-  // Running as bundled sidecar — package.json not available
+let version = process.env.ENGRAM_VERSION || 'unknown';
+if (version === 'unknown') {
+  try {
+    const packageJson = JSON.parse(
+      readFileSync(join(__dirname, '../package.json'), 'utf-8')
+    );
+    version = packageJson.version;
+  } catch {
+    // Running as bundled sidecar — package.json not available
+  }
 }
 
 const program = new Command();

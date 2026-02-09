@@ -37,6 +37,7 @@ async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> {
 export const api = {
   async getStatus() {
     return fetchJSON<{
+      version?: string;
       memory: { total: number; withEmbeddings: number; byCategory: Record<string, number>; byNamespace: Record<string, number> };
       model: { name: string; available: boolean; cached: boolean; loading: boolean; size: number };
       config?: { dataDir?: string; defaultNamespace?: string; recallLimit?: number; secretDetection?: boolean };
@@ -44,7 +45,7 @@ export const api = {
   },
 
   async getHealth() {
-    return fetchJSON<{ status: string }>(`http://localhost:${port}/health`);
+    return fetchJSON<{ status: string; version?: string }>(`http://localhost:${port}/health`);
   },
 
   async getMemories(params: Record<string, string | number> = {}) {

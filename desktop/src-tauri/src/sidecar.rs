@@ -45,6 +45,66 @@ fn arch_suffix() -> &'static str {
     }
 }
 
+/// Check the version of an Engram server running on the given port.
+/// Makes a synchronous HTTP GET to /health and parses the version from the JSON response.
+/// Returns Some(version) if it's an Engram server, None otherwise.
+fn check_server_version_sync(port: u16) -> Option<String> {
+    use std::io::{Read, Write};
+    use std::net::TcpStream;
+
+    let addr: std::net::SocketAddr = format!("127.0.0.1:{}", port).parse().ok()?;
+    let mut stream = TcpStream::connect_timeout(&addr, Duration::from_secs(2)).ok()?;
+    stream.set_read_timeout(Some(Duration::from_secs(2))).ok()?;
+    stream.set_write_timeout(Some(Duration::from_secs(2))).ok()?;
+
+    let request = format!(
+        "GET /health HTTP/1.1\r\nHost: localhost:{}\r\nConnection: close\r\n\r\n",
+        port
+    );
+    stream.write_all(request.as_bytes()).ok()?;
+
+    let mut response = Vec::new();
+    stream.read_to_end(&mut response).ok()?;
+    let response = String::from_utf8_lossy(&response);
+
+    // Verify it's an Engram server (response contains "status":"healthy")
+    if !response.contains("\"status\":\"healthy\"") {
+        return None;
+    }
+
+    // Parse version from JSON: look for "version":"X.Y.Z"
+    if let Some(start) = response.find("\"version\":\"") {
+        let rest = &response[start + 11..];
+        if let Some(end) = rest.find('"') {
+            let version = &rest[..end];
+            if !version.is_empty() && version != "unknown" {
+                return Some(version.to_string());
+            }
+        }
+    }
+
+    None
+}
+
+/// Kill processes listening on the given port using lsof + kill.
+/// Only call this when you've confirmed it's an Engram instance.
+fn kill_process_on_port(port: u16) {
+    let output = std::process::Command::new("lsof")
+        .args(["-t", "-i", &format!(":{}", port)])
+        .output();
+
+    if let Ok(output) = output {
+        let pids = String::from_utf8_lossy(&output.stdout);
+        for pid in pids.trim().lines() {
+            let pid = pid.trim();
+            if !pid.is_empty() {
+                eprintln!("[engram] Killing old Engram process on port {}: PID {}", port, pid);
+                let _ = std::process::Command::new("kill").arg(pid).output();
+            }
+        }
+    }
+}
+
 /// Return the onnxruntime arch directory name for the current architecture.
 fn ort_arch() -> &'static str {
     match std::env::consts::ARCH {
@@ -145,14 +205,39 @@ pub fn start_sidecar(app: &AppHandle) -> Result<(), String> {
     // Check if port is already in use by an existing Engram instance
     let addr: std::net::SocketAddr = format!("127.0.0.1:{}", port).parse().unwrap();
     if std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(500)).is_ok() {
-        eprintln!("[engram] Port {} already in use, attaching to existing instance", port);
-        if let Ok(mut status) = state.status.try_lock() {
-            *status = SidecarStatus::Running;
+        let expected_version = app.package_info().version.to_string();
+
+        match check_server_version_sync(port) {
+            Some(running_version) if running_version == expected_version => {
+                eprintln!(
+                    "[engram] Port {} in use by compatible Engram v{}, attaching",
+                    port, running_version
+                );
+                if let Ok(mut status) = state.status.try_lock() {
+                    *status = SidecarStatus::Running;
+                }
+                if let Ok(mut count) = state.restart_count.try_lock() {
+                    *count = 0;
+                }
+                return Ok(());
+            }
+            Some(running_version) => {
+                eprintln!(
+                    "[engram] Port {} in use by Engram v{} (expected v{}), replacing",
+                    port, running_version, expected_version
+                );
+                kill_process_on_port(port);
+                std::thread::sleep(Duration::from_secs(1));
+            }
+            None => {
+                eprintln!(
+                    "[engram] Port {} in use by unknown/old process, replacing",
+                    port
+                );
+                kill_process_on_port(port);
+                std::thread::sleep(Duration::from_secs(1));
+            }
         }
-        if let Ok(mut count) = state.restart_count.try_lock() {
-            *count = 0;
-        }
-        return Ok(());
     }
 
     // Try bundled sidecar first (production), fall back to node (development)

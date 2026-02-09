@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { existsSync, mkdirSync, rmSync, copyFileSync, cpSync, chmodSync } from 'fs';
+import { existsSync, mkdirSync, rmSync, copyFileSync, cpSync, chmodSync, readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
@@ -8,6 +8,9 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..');
+
+// Read version from package.json to inject at build time
+const pkgVersion = JSON.parse(readFileSync(join(projectRoot, 'package.json'), 'utf-8')).version;
 const resourcesDir = join(projectRoot, 'desktop/src-tauri/resources');
 const nodeModulesDir = join(projectRoot, 'node_modules');
 
@@ -73,6 +76,7 @@ async function buildSidecar() {
     `--alias:onnxruntime-web=${join(stubsDir, 'onnxruntime-web.cjs')}`,
     `--alias:sharp=${join(stubsDir, 'sharp.cjs')}`,
     '--define:import.meta.url=__import_meta_url',
+    `--define:process.env.ENGRAM_VERSION='"${pkgVersion}"'`,
     `--banner:js='var __import_meta_url = require("url").pathToFileURL(__filename).href;'`,
     '--log-level=warning',
   ].join(' ');
