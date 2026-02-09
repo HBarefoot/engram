@@ -409,7 +409,7 @@ export function createRESTServer(config) {
         detectContradictions,
         applyDecay,
         cleanupStale,
-        ...(duplicateThreshold != null && { duplicateThreshold })
+        ...(duplicateThreshold !== undefined && duplicateThreshold !== null && { duplicateThreshold })
       });
 
       logger.info('Consolidation completed via API', results);
