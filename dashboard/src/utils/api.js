@@ -64,6 +64,30 @@ export const api = {
     return res.json();
   },
 
+  // Contradictions endpoints
+  async getContradictions(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    const res = await fetch(`${API_BASE}/contradictions${query ? `?${query}` : ''}`);
+    if (!res.ok) throw new Error('Failed to fetch contradictions');
+    return res.json();
+  },
+
+  async resolveContradiction(id, action) {
+    const res = await fetch(`${API_BASE}/contradictions/${id}/resolve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action })
+    });
+    if (!res.ok) throw new Error('Failed to resolve contradiction');
+    return res.json();
+  },
+
+  async getContradictionCount() {
+    const res = await fetch(`${API_BASE}/contradictions/count`);
+    if (!res.ok) throw new Error('Failed to fetch contradiction count');
+    return res.json();
+  },
+
   async getHealth() {
     const res = await fetch('/health');
     if (!res.ok) throw new Error('Failed to fetch health');

@@ -130,6 +130,32 @@ function runMigrations(db) {
     );
   `);
 
+  // Contradictions table for detected memory conflicts
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS contradictions (
+      id TEXT PRIMARY KEY,
+      memory1_id TEXT NOT NULL,
+      memory2_id TEXT NOT NULL,
+      confidence REAL NOT NULL DEFAULT 0.5,
+      reason TEXT,
+      category TEXT,
+      entity TEXT,
+      status TEXT NOT NULL DEFAULT 'unresolved',
+      detected_at INTEGER NOT NULL,
+      resolved_at INTEGER,
+      resolution_action TEXT,
+      FOREIGN KEY (memory1_id) REFERENCES memories(id) ON DELETE CASCADE,
+      FOREIGN KEY (memory2_id) REFERENCES memories(id) ON DELETE CASCADE
+    );
+  `);
+
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_contradictions_status ON contradictions(status);
+    CREATE INDEX IF NOT EXISTS idx_contradictions_memory1 ON contradictions(memory1_id);
+    CREATE INDEX IF NOT EXISTS idx_contradictions_memory2 ON contradictions(memory2_id);
+    CREATE INDEX IF NOT EXISTS idx_contradictions_detected_at ON contradictions(detected_at);
+  `);
+
   logger.debug('Database migrations completed');
 }
 
@@ -623,4 +649,314 @@ function deserializeMemory(row) {
   }
 
   return memory;
+}
+
+// --- Contradiction CRUD ---
+
+/**
+ * Create a contradiction record
+ * @param {Database} db
+ * @param {Object} contradiction
+ * @param {string} contradiction.memory1_id
+ * @param {string} contradiction.memory2_id
+ * @param {number} contradiction.confidence - 0.0 to 1.0
+ * @param {string} contradiction.reason
+ * @param {string} [contradiction.category]
+ * @param {string} [contradiction.entity]
+ * @returns {Object} Created contradiction record
+ */
+export function createContradiction(db, contradiction) {
+  const id = generateId();
+  const now = Date.now();
+
+  const stmt = db.prepare(`
+    INSERT INTO contradictions (id, memory1_id, memory2_id, confidence, reason, category, entity, status, detected_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'unresolved', ?)
+  `);
+
+  stmt.run(
+    id,
+    contradiction.memory1_id,
+    contradiction.memory2_id,
+    contradiction.confidence,
+    contradiction.reason || null,
+    contradiction.category || null,
+    contradiction.entity || null,
+    now
+  );
+
+  logger.debug('Contradiction created', { id, entity: contradiction.entity });
+
+  return getContradiction(db, id);
+}
+
+/**
+ * Get a single contradiction by ID with full memory details
+ * @param {Database} db
+ * @param {string} id
+ * @returns {Object|null}
+ */
+export function getContradiction(db, id) {
+  const stmt = db.prepare(`
+    SELECT c.*,
+      m1.content as m1_content, m1.category as m1_category, m1.entity as m1_entity,
+      m1.confidence as m1_confidence, m1.created_at as m1_created_at,
+      m1.namespace as m1_namespace, m1.tags as m1_tags, m1.source as m1_source,
+      m2.content as m2_content, m2.category as m2_category, m2.entity as m2_entity,
+      m2.confidence as m2_confidence, m2.created_at as m2_created_at,
+      m2.namespace as m2_namespace, m2.tags as m2_tags, m2.source as m2_source
+    FROM contradictions c
+    LEFT JOIN memories m1 ON c.memory1_id = m1.id
+    LEFT JOIN memories m2 ON c.memory2_id = m2.id
+    WHERE c.id = ?
+  `);
+
+  const row = stmt.get(id);
+  if (!row) return null;
+
+  return deserializeContradiction(row);
+}
+
+/**
+ * List contradictions with optional filters
+ * @param {Database} db
+ * @param {Object} [options]
+ * @param {string} [options.status] - Filter by status
+ * @param {string} [options.category] - Filter by memory category
+ * @param {string} [options.sort='detected_at'] - Sort field
+ * @param {number} [options.limit=50]
+ * @param {number} [options.offset=0]
+ * @returns {{ items: Object[], total: number }}
+ */
+export function listContradictions(db, options = {}) {
+  const {
+    status,
+    category,
+    sort = 'detected_at',
+    limit = 50,
+    offset = 0
+  } = options;
+
+  const conditions = [];
+  const params = [];
+
+  if (status && status !== 'all') {
+    conditions.push('c.status = ?');
+    params.push(status);
+  }
+
+  if (category) {
+    conditions.push('(m1.category = ? OR m2.category = ?)');
+    params.push(category, category);
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  // Validate sort to prevent injection
+  const sortMap = {
+    'detected_at': 'c.detected_at DESC',
+    'detected_at_asc': 'c.detected_at ASC',
+    'confidence': 'c.confidence DESC'
+  };
+  const orderBy = sortMap[sort] || 'c.detected_at DESC';
+
+  // Get total count
+  const countStmt = db.prepare(`
+    SELECT COUNT(*) as count
+    FROM contradictions c
+    LEFT JOIN memories m1 ON c.memory1_id = m1.id
+    LEFT JOIN memories m2 ON c.memory2_id = m2.id
+    ${where}
+  `);
+  const total = countStmt.get(...params).count;
+
+  // Get items
+  const stmt = db.prepare(`
+    SELECT c.*,
+      m1.content as m1_content, m1.category as m1_category, m1.entity as m1_entity,
+      m1.confidence as m1_confidence, m1.created_at as m1_created_at,
+      m1.namespace as m1_namespace, m1.tags as m1_tags, m1.source as m1_source,
+      m2.content as m2_content, m2.category as m2_category, m2.entity as m2_entity,
+      m2.confidence as m2_confidence, m2.created_at as m2_created_at,
+      m2.namespace as m2_namespace, m2.tags as m2_tags, m2.source as m2_source
+    FROM contradictions c
+    LEFT JOIN memories m1 ON c.memory1_id = m1.id
+    LEFT JOIN memories m2 ON c.memory2_id = m2.id
+    ${where}
+    ORDER BY ${orderBy}
+    LIMIT ? OFFSET ?
+  `);
+
+  const rows = stmt.all(...params, limit, offset);
+
+  return {
+    items: rows.map(deserializeContradiction),
+    total
+  };
+}
+
+/**
+ * Resolve a contradiction
+ * @param {Database} db
+ * @param {string} id - Contradiction ID
+ * @param {string} action - 'keep_first' | 'keep_second' | 'keep_both' | 'dismiss'
+ * @returns {Object|null} Updated contradiction or null if not found
+ */
+export function resolveContradiction(db, id, action) {
+  const contradiction = getContradiction(db, id);
+  if (!contradiction) return null;
+
+  const now = Date.now();
+
+  // Perform side effects based on action
+  if (action === 'keep_first' && contradiction.memory2) {
+    deleteMemory(db, contradiction.memory2.id);
+  } else if (action === 'keep_second' && contradiction.memory1) {
+    deleteMemory(db, contradiction.memory1.id);
+  }
+
+  const newStatus = action === 'dismiss' ? 'dismissed' : 'resolved';
+
+  const stmt = db.prepare(`
+    UPDATE contradictions
+    SET status = ?, resolved_at = ?, resolution_action = ?
+    WHERE id = ?
+  `);
+  stmt.run(newStatus, now, action, id);
+
+  logger.info('Contradiction resolved', { id, action, status: newStatus });
+
+  return getContradiction(db, id);
+}
+
+/**
+ * Check if a contradiction already exists for a memory pair (unresolved only)
+ * @param {Database} db
+ * @param {string} memory1Id
+ * @param {string} memory2Id
+ * @returns {boolean}
+ */
+export function contradictionExists(db, memory1Id, memory2Id) {
+  const stmt = db.prepare(`
+    SELECT COUNT(*) as count FROM contradictions
+    WHERE status = 'unresolved'
+      AND ((memory1_id = ? AND memory2_id = ?) OR (memory1_id = ? AND memory2_id = ?))
+  `);
+  return stmt.get(memory1Id, memory2Id, memory2Id, memory1Id).count > 0;
+}
+
+/**
+ * Count unresolved contradictions
+ * @param {Database} db
+ * @returns {number}
+ */
+export function countUnresolvedContradictions(db) {
+  const stmt = db.prepare("SELECT COUNT(*) as count FROM contradictions WHERE status = 'unresolved'");
+  return stmt.get().count;
+}
+
+/**
+ * Migrate existing tag-based conflicts to contradictions table.
+ * Runs once (checks meta table for flag).
+ * @param {Database} db
+ * @returns {number} Number of contradictions migrated
+ */
+export function migrateTagConflicts(db) {
+  // Check if already migrated
+  const metaStmt = db.prepare('SELECT value FROM meta WHERE key = ?');
+  const migrated = metaStmt.get('contradictions_migrated');
+  if (migrated) return 0;
+
+  // Find all memories with conflict tags
+  const memories = listMemories(db, { limit: 10000 });
+  const conflicts = memories.filter(m =>
+    m.tags && m.tags.some(tag => tag.startsWith('conflict_'))
+  );
+
+  // Group by conflict ID
+  const grouped = new Map();
+  for (const memory of conflicts) {
+    const conflictTags = memory.tags.filter(tag => tag.startsWith('conflict_'));
+    for (const conflictId of conflictTags) {
+      if (!grouped.has(conflictId)) {
+        grouped.set(conflictId, []);
+      }
+      grouped.get(conflictId).push(memory);
+    }
+  }
+
+  let count = 0;
+  for (const [, mems] of grouped.entries()) {
+    if (mems.length < 2) continue;
+
+    // Create pairwise contradictions
+    for (let i = 0; i < mems.length; i++) {
+      for (let j = i + 1; j < mems.length; j++) {
+        if (!contradictionExists(db, mems[i].id, mems[j].id)) {
+          createContradiction(db, {
+            memory1_id: mems[i].id,
+            memory2_id: mems[j].id,
+            confidence: 0.5,
+            reason: 'Legacy tag-based detection',
+            category: mems[i].category,
+            entity: mems[i].entity
+          });
+          count++;
+        }
+      }
+    }
+  }
+
+  // Mark as migrated
+  db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run(
+    'contradictions_migrated',
+    new Date().toISOString()
+  );
+
+  if (count > 0) {
+    logger.info('Migrated tag-based conflicts to contradictions table', { count });
+  }
+
+  return count;
+}
+
+/**
+ * Deserialize a contradiction row with joined memory data
+ * @param {Object} row
+ * @returns {Object}
+ */
+function deserializeContradiction(row) {
+  return {
+    id: row.id,
+    confidence: row.confidence,
+    reason: row.reason,
+    category: row.category,
+    entity: row.entity,
+    status: row.status,
+    detected_at: row.detected_at,
+    resolved_at: row.resolved_at,
+    resolution_action: row.resolution_action,
+    memory1: row.m1_content ? {
+      id: row.memory1_id,
+      content: row.m1_content,
+      category: row.m1_category,
+      entity: row.m1_entity,
+      confidence: row.m1_confidence,
+      created_at: row.m1_created_at,
+      namespace: row.m1_namespace,
+      tags: JSON.parse(row.m1_tags || '[]'),
+      source: row.m1_source
+    } : null,
+    memory2: row.m2_content ? {
+      id: row.memory2_id,
+      content: row.m2_content,
+      category: row.m2_category,
+      entity: row.m2_entity,
+      confidence: row.m2_confidence,
+      created_at: row.m2_created_at,
+      namespace: row.m2_namespace,
+      tags: JSON.parse(row.m2_tags || '[]'),
+      source: row.m2_source
+    } : null
+  };
 }

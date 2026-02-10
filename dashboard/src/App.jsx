@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Dashboard from './pages/Dashboard';
 import MemoryList from './pages/MemoryList';
 import SearchMemories from './pages/SearchMemories';
@@ -7,9 +7,18 @@ import Agents from './pages/Agents';
 import Download from './pages/Download';
 import ImportWizard from './pages/ImportWizard';
 import MemoryHealth from './pages/MemoryHealth';
+import Contradictions from './pages/Contradictions';
+import { api } from './utils/api';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const [contradictionCount, setContradictionCount] = useState(0);
+
+  useEffect(() => {
+    api.getContradictionCount()
+      .then(data => setContradictionCount(data.count || 0))
+      .catch(() => {});
+  }, [currentPage]);
 
   const pages = {
     dashboard: <Dashboard />,
@@ -18,6 +27,7 @@ function App() {
     agents: <Agents />,
     statistics: <Statistics />,
     health: <MemoryHealth />,
+    contradictions: <Contradictions />,
     download: <Download />,
     import: <ImportWizard />
   };
@@ -95,6 +105,21 @@ function App() {
                   } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium`}
                 >
                   Health
+                </button>
+                <button
+                  onClick={() => setCurrentPage('contradictions')}
+                  className={`${
+                    currentPage === 'contradictions'
+                      ? 'border-primary-500 text-gray-900 dark:text-white'
+                      : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+                  } inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium relative`}
+                >
+                  Conflicts
+                  {contradictionCount > 0 && (
+                    <span className="ml-1.5 inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full">
+                      {contradictionCount}
+                    </span>
+                  )}
                 </button>
                 <button
                   onClick={() => setCurrentPage('import')}

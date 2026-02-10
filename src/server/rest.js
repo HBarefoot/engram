@@ -4,9 +4,9 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { loadConfig, getDatabasePath, getModelsPath } from '../config/index.js';
-import { initDatabase, createMemory, getMemory, deleteMemory, listMemories, getStats } from '../memory/store.js';
+import { initDatabase, createMemory, getMemory, deleteMemory, listMemories, getStats, listContradictions, resolveContradiction, countUnresolvedContradictions, migrateTagConflicts } from '../memory/store.js';
 import { recallMemories } from '../memory/recall.js';
-import { consolidate, getConflicts } from '../memory/consolidate.js';
+import { consolidate, getConflicts, detectContradictionsForMemory } from '../memory/consolidate.js';
 import { getOverview, getStaleMemories, getNeverRecalled, getDuplicateClusters, getTrends } from '../memory/analytics.js';
 import { calculateHealthScore } from '../memory/health.js';
 import { validateContent } from '../extract/secrets.js';
@@ -71,6 +71,13 @@ export function createRESTServer(config) {
   // Initialize database
   const db = initDatabase(getDatabasePath(config));
   const modelsPath = getModelsPath(config);
+
+  // Migrate legacy tag-based conflicts to contradictions table
+  try {
+    migrateTagConflicts(db);
+  } catch (error) {
+    logger.warn('Tag conflict migration failed', { error: error.message });
+  }
 
   // CORS support
   fastify.addHook('onRequest', async (request, reply) => {
@@ -211,6 +218,13 @@ export function createRESTServer(config) {
       const memory = createMemory(db, memoryData);
 
       logger.info('Memory created via API', { id: memory.id, category: memory.category });
+
+      // Proactive contradiction detection (fire-and-forget)
+      setImmediate(() => {
+        detectContradictionsForMemory(db, memory).catch(err => {
+          logger.warn('Proactive contradiction detection failed', { error: err.message });
+        });
+      });
 
       return {
         success: true,
@@ -452,6 +466,78 @@ export function createRESTServer(config) {
       };
     } catch (error) {
       logger.error('Get conflicts error', { error: error.message });
+      reply.code(500);
+      return { error: error.message };
+    }
+  });
+
+  // --- Contradictions endpoints ---
+
+  // List contradictions with filtering
+  fastify.get('/api/contradictions', async (request, reply) => {
+    try {
+      const { status, category, sort, limit, offset } = request.query;
+
+      const result = listContradictions(db, {
+        status: status || undefined,
+        category: category || undefined,
+        sort: sort || 'detected_at',
+        limit: limit ? parseInt(limit) : 50,
+        offset: offset ? parseInt(offset) : 0
+      });
+
+      const unresolvedCount = countUnresolvedContradictions(db);
+
+      return {
+        success: true,
+        contradictions: result.items,
+        unresolvedCount,
+        pagination: {
+          limit: limit ? parseInt(limit) : 50,
+          offset: offset ? parseInt(offset) : 0,
+          total: result.total
+        }
+      };
+    } catch (error) {
+      logger.error('Get contradictions error', { error: error.message });
+      reply.code(500);
+      return { error: error.message };
+    }
+  });
+
+  // Resolve a contradiction
+  fastify.post('/api/contradictions/:id/resolve', async (request, reply) => {
+    try {
+      const { id } = request.params;
+      const { action } = request.body || {};
+
+      const validActions = ['keep_first', 'keep_second', 'keep_both', 'dismiss'];
+      if (!action || !validActions.includes(action)) {
+        reply.code(400);
+        return { error: 'Invalid action. Must be: keep_first, keep_second, keep_both, or dismiss' };
+      }
+
+      const result = resolveContradiction(db, id, action);
+      if (!result) {
+        reply.code(404);
+        return { error: 'Contradiction not found' };
+      }
+
+      return { success: true, contradiction: result };
+    } catch (error) {
+      logger.error('Resolve contradiction error', { error: error.message });
+      reply.code(500);
+      return { error: error.message };
+    }
+  });
+
+  // Get unresolved contradiction count (for badge)
+  fastify.get('/api/contradictions/count', async (request, reply) => {
+    try {
+      const count = countUnresolvedContradictions(db);
+      return { success: true, count };
+    } catch (error) {
+      logger.error('Contradiction count error', { error: error.message });
       reply.code(500);
       return { error: error.message };
     }
