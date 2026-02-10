@@ -193,6 +193,24 @@ export const api = {
       body: JSON.stringify({ memories, namespace }),
     });
   },
+
+  // Contradiction endpoints
+  async getContradictions(params: Record<string, string> = {}) {
+    const query = new URLSearchParams(params).toString();
+    return fetchJSON<ContradictionsData>(`${getApiBase()}/contradictions${query ? `?${query}` : ""}`);
+  },
+
+  async resolveContradiction(id: string, action: string) {
+    return fetchJSON<{ success: boolean; contradiction: Contradiction }>(`${getApiBase()}/contradictions/${id}/resolve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+  },
+
+  async getContradictionCount() {
+    return fetchJSON<{ success: boolean; count: number }>(`${getApiBase()}/contradictions/count`);
+  },
 };
 
 // ---- Shared types ----
@@ -294,4 +312,34 @@ export interface TrendPoint {
 
 export interface TrendsData {
   daily: TrendPoint[];
+}
+
+export interface ContradictionMemory {
+  id: string;
+  content: string;
+  category: string;
+  confidence: number;
+  source: string;
+  created_at: number;
+}
+
+export interface Contradiction {
+  id: string;
+  memory1: ContradictionMemory | null;
+  memory2: ContradictionMemory | null;
+  confidence: number;
+  reason: string | null;
+  category: string | null;
+  entity: string | null;
+  status: string;
+  detected_at: number;
+  resolved_at: number | null;
+  resolution_action: string | null;
+}
+
+export interface ContradictionsData {
+  success: boolean;
+  contradictions: Contradiction[];
+  unresolvedCount: number;
+  pagination: { limit: number; offset: number; total: number };
 }

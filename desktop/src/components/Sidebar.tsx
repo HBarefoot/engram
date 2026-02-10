@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { getHealthUrl } from "../lib/api";
+import { getHealthUrl, api } from "../lib/api";
 
 interface NavItem {
   path: string;
@@ -64,6 +64,15 @@ const NAV_ITEMS: NavItem[] = [
     ),
   },
   {
+    path: "/contradictions",
+    label: "Conflicts",
+    icon: (
+      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+      </svg>
+    ),
+  },
+  {
     path: "/import",
     label: "Import",
     icon: (
@@ -89,6 +98,7 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const [healthy, setHealthy] = useState(false);
+  const [contradictionCount, setContradictionCount] = useState(0);
 
   const checkHealth = useCallback(async () => {
     try {
@@ -99,11 +109,25 @@ export default function Sidebar() {
     }
   }, []);
 
+  const fetchContradictionCount = useCallback(async () => {
+    try {
+      const data = await api.getContradictionCount();
+      setContradictionCount(data.count || 0);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   useEffect(() => {
     checkHealth();
+    fetchContradictionCount();
     const interval = setInterval(checkHealth, 10000);
-    return () => clearInterval(interval);
-  }, [checkHealth]);
+    const countInterval = setInterval(fetchContradictionCount, 15000);
+    return () => {
+      clearInterval(interval);
+      clearInterval(countInterval);
+    };
+  }, [checkHealth, fetchContradictionCount]);
 
   const isActive = (path: string) => {
     if (path === "/") return location.pathname === "/";
@@ -134,6 +158,11 @@ export default function Sidebar() {
           >
             <span className={isActive(item.path) ? "text-blue-600 dark:text-blue-400" : ""}>{item.icon}</span>
             {item.label}
+            {item.path === "/contradictions" && contradictionCount > 0 && (
+              <span className="ml-auto inline-flex items-center justify-center px-1.5 py-0.5 text-xs font-bold leading-none text-red-100 bg-red-600 rounded-full">
+                {contradictionCount}
+              </span>
+            )}
           </button>
         ))}
       </nav>

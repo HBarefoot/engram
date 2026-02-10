@@ -1,4 +1,4 @@
-import { getMemoriesWithEmbeddings, listMemories, updateMemory, deleteMemory } from './store.js';
+import { getMemoriesWithEmbeddings, listMemories, updateMemory, deleteMemory, createContradiction, contradictionExists } from './store.js';
 import { cosineSimilarity } from '../embed/index.js';
 import * as logger from '../utils/logger.js';
 
@@ -44,10 +44,8 @@ export async function consolidate(db, options = {}) {
     // Step 2: Detect contradictions
     if (detectContradictions) {
       logger.debug('Detecting contradictions...');
-      const contradictions = await findContradictions(db);
-      results.contradictionsDetected = contradictions.length;
-      // Flag contradictions (don't auto-resolve)
-      await flagContradictions(db, contradictions);
+      const newContradictions = await findContradictions(db);
+      results.contradictionsDetected = newContradictions.length;
       logger.info('Contradictions detected', { count: results.contradictionsDetected });
     }
 
@@ -177,13 +175,13 @@ async function mergeDuplicates(db, duplicates) {
 }
 
 /**
- * Find contradictory memories
+ * Find contradictory memories and write to contradictions table
  * @param {Database} db - SQLite database instance
- * @returns {Promise<Array>} Array of contradiction pairs
+ * @returns {Promise<Array>} Array of newly created contradiction records
  */
 async function findContradictions(db) {
   const memories = getMemoriesWithEmbeddings(db);
-  const contradictions = [];
+  const newContradictions = [];
 
   // Group memories by entity
   const byEntity = new Map();
@@ -210,63 +208,97 @@ async function findContradictions(db) {
           continue;
         }
 
-        // Check if contents suggest contradiction
-        if (seemsContradictory(memA.content, memB.content)) {
-          contradictions.push({
-            memory1: memA,
-            memory2: memB,
-            entity
-          });
+        const result = seemsContradictory(memA.content, memB.content);
+        if (result.isContradiction && !contradictionExists(db, memA.id, memB.id)) {
+          try {
+            const record = createContradiction(db, {
+              memory1_id: memA.id,
+              memory2_id: memB.id,
+              confidence: result.confidence,
+              reason: result.reason,
+              category: memA.category,
+              entity
+            });
+            newContradictions.push(record);
+          } catch (error) {
+            logger.warn('Failed to create contradiction record', { error: error.message });
+          }
         }
       }
     }
   }
 
-  return contradictions;
+  return newContradictions;
 }
 
 /**
  * Check if two memory contents seem contradictory
  * @param {string} contentA - First memory content
  * @param {string} contentB - Second memory content
- * @returns {boolean} True if potentially contradictory
+ * @returns {{ isContradiction: boolean, confidence: number, reason: string }}
  */
 function seemsContradictory(contentA, contentB) {
   const lowerA = contentA.toLowerCase();
   const lowerB = contentB.toLowerCase();
+  const noResult = { isContradiction: false, confidence: 0, reason: '' };
 
-  // Check for explicit contradictions
-  const contradictionPatterns = [
-    // Preferences
-    { a: /prefer.*?(\w+)/, b: /prefer.*?(\w+)/ },
-    { a: /uses?\s+(\w+)/, b: /uses?\s+(\w+)/ },
-    { a: /instead of\s+(\w+)/, b: /instead of\s+(\w+)/ },
+  // 1. Version conflict: both mention version numbers but different ones
+  const versionA = lowerA.match(/version\s+(\d[\d.]*)/);
+  const versionB = lowerB.match(/version\s+(\d[\d.]*)/);
+  if (versionA && versionB && versionA[1] !== versionB[1]) {
+    return { isContradiction: true, confidence: 0.85, reason: `Version mismatch: ${versionA[1]} vs ${versionB[1]}` };
+  }
 
-    // Facts
-    { a: /is\s+(\w+)/, b: /is\s+(\w+)/ },
-    { a: /version\s+(\d+)/, b: /version\s+(\d+)/ },
-
-    // Negations
-    { a: /never|not|doesn't|don't/, b: /always|does|do/ }
-  ];
-
-  // Simple heuristic: if one contains "not"/"never" and the other doesn't
-  const hasNegationA = /\b(not|never|doesn't|don't|avoid|dislike)\b/i.test(lowerA);
-  const hasNegationB = /\b(not|never|doesn't|don't|avoid|dislike)\b/i.test(lowerB);
-
-  if (hasNegationA !== hasNegationB) {
-    // Remove negation words and check similarity
-    const normalizedA = lowerA.replace(/\b(not|never|doesn't|don't|avoid|dislike)\b/gi, '');
-    const normalizedB = lowerB.replace(/\b(not|never|doesn't|don't|avoid|dislike)\b/gi, '');
-
-    // If the rest is similar, it's likely a contradiction
-    const similarity = simpleSimilarity(normalizedA, normalizedB);
-    if (similarity > 0.6) {
-      return true;
+  // 2. Preference conflict: both express preference but for different things
+  const prefA = lowerA.match(/\b(?:prefer|prefers|likes?|chooses?|uses?)\s+(\w+)/);
+  const prefB = lowerB.match(/\b(?:prefer|prefers|likes?|chooses?|uses?)\s+(\w+)/);
+  if (prefA && prefB && prefA[1] !== prefB[1]) {
+    // Only flag if the surrounding context is similar (same topic)
+    const sim = simpleSimilarity(lowerA, lowerB);
+    if (sim > 0.3) {
+      return { isContradiction: true, confidence: 0.8, reason: `Conflicting preferences: "${prefA[1]}" vs "${prefB[1]}"` };
     }
   }
 
-  return false;
+  // 3. Boolean flip: enabled vs disabled, true vs false, on vs off
+  const boolA = /\b(enabled|true|on|active)\b/i.test(lowerA);
+  const boolB = /\b(disabled|false|off|inactive)\b/i.test(lowerB);
+  const boolA2 = /\b(disabled|false|off|inactive)\b/i.test(lowerA);
+  const boolB2 = /\b(enabled|true|on|active)\b/i.test(lowerB);
+  if ((boolA && boolB) || (boolA2 && boolB2)) {
+    const sim = simpleSimilarity(
+      lowerA.replace(/\b(enabled|disabled|true|false|on|off|active|inactive)\b/gi, ''),
+      lowerB.replace(/\b(enabled|disabled|true|false|on|off|active|inactive)\b/gi, '')
+    );
+    if (sim > 0.5) {
+      return { isContradiction: true, confidence: 0.75, reason: 'Opposing boolean state' };
+    }
+  }
+
+  // 4. Negation detection (enhanced from original)
+  const hasNegationA = /\b(not|never|doesn't|don't|avoid|dislike|won't|can't|cannot)\b/i.test(lowerA);
+  const hasNegationB = /\b(not|never|doesn't|don't|avoid|dislike|won't|can't|cannot)\b/i.test(lowerB);
+  if (hasNegationA !== hasNegationB) {
+    const normalizedA = lowerA.replace(/\b(not|never|doesn't|don't|avoid|dislike|won't|can't|cannot)\b/gi, '');
+    const normalizedB = lowerB.replace(/\b(not|never|doesn't|don't|avoid|dislike|won't|can't|cannot)\b/gi, '');
+    const similarity = simpleSimilarity(normalizedA, normalizedB);
+    if (similarity > 0.6) {
+      return { isContradiction: true, confidence: 0.7, reason: 'Negation conflict: one affirms, the other denies' };
+    }
+  }
+
+  // 5. Temporal supersession: "switched from X to Y" vs "uses X"
+  const switchMatch = lowerA.match(/\b(?:switched|migrated|moved)\s+(?:from\s+)?(\w+)\s+to\s+(\w+)/)
+    || lowerB.match(/\b(?:switched|migrated|moved)\s+(?:from\s+)?(\w+)\s+to\s+(\w+)/);
+  if (switchMatch) {
+    const oldThing = switchMatch[1];
+    const other = switchMatch.input === lowerA ? lowerB : lowerA;
+    if (other.includes(oldThing) && !other.includes('switched') && !other.includes('migrated')) {
+      return { isContradiction: true, confidence: 0.6, reason: `Possible outdated info after switch from "${oldThing}"` };
+    }
+  }
+
+  return noResult;
 }
 
 /**
@@ -286,42 +318,51 @@ function simpleSimilarity(a, b) {
 }
 
 /**
- * Flag contradictions for user review
+ * Check a single new memory against existing memories for contradictions.
+ * Called on memory insert for proactive detection.
  * @param {Database} db - SQLite database instance
- * @param {Array} contradictions - Array of contradiction pairs
- * @returns {Promise<number>} Number of contradictions flagged
+ * @param {Object} newMemory - The newly created memory object
+ * @returns {Promise<Array>} Array of new contradiction records
  */
-async function flagContradictions(db, contradictions) {
-  let flagged = 0;
+export async function detectContradictionsForMemory(db, newMemory) {
+  if (!newMemory.entity) return [];
 
-  for (const { memory1, memory2 } of contradictions) {
-    try {
-      // Generate a conflict ID for this pair
-      const conflictId = `conflict_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+  // Get memories with the same entity and namespace
+  const candidates = listMemories(db, {
+    limit: 50,
+    sort: 'created_at DESC'
+  }).filter(m =>
+    m.id !== newMemory.id &&
+    m.entity === newMemory.entity &&
+    m.namespace === (newMemory.namespace || 'default')
+  );
 
-      // Add conflict tag to both memories
-      const tags1 = memory1.tags || [];
-      const tags2 = memory2.tags || [];
+  const newContradictions = [];
 
-      if (!tags1.includes(conflictId)) {
-        updateMemory(db, memory1.id, {
-          tags: [...tags1, conflictId, 'has-conflict']
+  for (const candidate of candidates) {
+    const result = seemsContradictory(newMemory.content, candidate.content);
+    if (result.isContradiction && !contradictionExists(db, newMemory.id, candidate.id)) {
+      try {
+        const record = createContradiction(db, {
+          memory1_id: candidate.id,
+          memory2_id: newMemory.id,
+          confidence: result.confidence,
+          reason: result.reason,
+          category: newMemory.category,
+          entity: newMemory.entity
         });
+        newContradictions.push(record);
+      } catch (error) {
+        logger.warn('Proactive contradiction detection failed for pair', { error: error.message });
       }
-
-      if (!tags2.includes(conflictId)) {
-        updateMemory(db, memory2.id, {
-          tags: [...tags2, conflictId, 'has-conflict']
-        });
-      }
-
-      flagged++;
-    } catch (error) {
-      logger.warn('Failed to flag contradiction', { error: error.message });
     }
   }
 
-  return flagged;
+  if (newContradictions.length > 0) {
+    logger.info('Proactive contradiction detection found conflicts', { count: newContradictions.length });
+  }
+
+  return newContradictions;
 }
 
 /**
@@ -386,35 +427,46 @@ async function cleanupStaleMemories(db) {
 }
 
 /**
- * Get memories flagged with contradictions
+ * Get conflicts from contradictions table (backward-compatible).
+ * Returns the old { conflictId, memories[] } shape for existing consumers.
  * @param {Database} db - SQLite database instance
- * @returns {Object[]} Array of memories with conflict tags
+ * @returns {Object[]} Array of conflict objects
  */
 export function getConflicts(db) {
-  const memories = listMemories(db, { limit: 10000 });
+  const stmt = db.prepare(`
+    SELECT c.id, c.memory1_id, c.memory2_id,
+      m1.id as m1_id, m1.content as m1_content, m1.category as m1_category,
+      m1.entity as m1_entity, m1.confidence as m1_confidence,
+      m1.created_at as m1_created_at, m1.namespace as m1_namespace,
+      m1.tags as m1_tags, m1.source as m1_source,
+      m2.id as m2_id, m2.content as m2_content, m2.category as m2_category,
+      m2.entity as m2_entity, m2.confidence as m2_confidence,
+      m2.created_at as m2_created_at, m2.namespace as m2_namespace,
+      m2.tags as m2_tags, m2.source as m2_source
+    FROM contradictions c
+    LEFT JOIN memories m1 ON c.memory1_id = m1.id
+    LEFT JOIN memories m2 ON c.memory2_id = m2.id
+    WHERE c.status = 'unresolved'
+    ORDER BY c.detected_at DESC
+  `);
 
-  // Find all memories with conflict tags
-  const conflicts = memories.filter(m =>
-    m.tags && m.tags.some(tag => tag.startsWith('conflict_') || tag === 'has-conflict')
-  );
+  const rows = stmt.all();
 
-  // Group by conflict ID
-  const grouped = new Map();
-
-  for (const memory of conflicts) {
-    const conflictTags = memory.tags.filter(tag => tag.startsWith('conflict_'));
-
-    for (const conflictId of conflictTags) {
-      if (!grouped.has(conflictId)) {
-        grouped.set(conflictId, []);
-      }
-      grouped.get(conflictId).push(memory);
-    }
-  }
-
-  // Convert to array of conflict pairs
-  return Array.from(grouped.entries()).map(([conflictId, memories]) => ({
-    conflictId,
-    memories
+  return rows.map(row => ({
+    conflictId: row.id,
+    memories: [
+      row.m1_content ? {
+        id: row.m1_id, content: row.m1_content, category: row.m1_category,
+        entity: row.m1_entity, confidence: row.m1_confidence,
+        created_at: row.m1_created_at, namespace: row.m1_namespace,
+        tags: JSON.parse(row.m1_tags || '[]'), source: row.m1_source
+      } : null,
+      row.m2_content ? {
+        id: row.m2_id, content: row.m2_content, category: row.m2_category,
+        entity: row.m2_entity, confidence: row.m2_confidence,
+        created_at: row.m2_created_at, namespace: row.m2_namespace,
+        tags: JSON.parse(row.m2_tags || '[]'), source: row.m2_source
+      } : null
+    ].filter(Boolean)
   }));
 }

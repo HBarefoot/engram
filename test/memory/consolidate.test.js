@@ -5,7 +5,8 @@ import os from 'os';
 import {
   initDatabase,
   createMemory,
-  getMemory
+  getMemory,
+  createContradiction
 } from '../../src/memory/store.js';
 import { consolidate, getConflicts } from '../../src/memory/consolidate.js';
 
@@ -199,48 +200,42 @@ describe('Memory Consolidation', () => {
       expect(conflicts).toEqual([]);
     });
 
-    it('should return memories with conflict tags', () => {
-      const conflictId = 'conflict_123';
+    it('should return contradictions from the contradictions table', () => {
+      const memA = createMemory(db, { content: 'Memory A' });
+      const memB = createMemory(db, { content: 'Memory B' });
 
-      createMemory(db, {
-        content: 'Memory A',
-        tags: [conflictId, 'has-conflict']
-      });
-
-      createMemory(db, {
-        content: 'Memory B',
-        tags: [conflictId, 'has-conflict']
+      createContradiction(db, {
+        memory1_id: memA.id,
+        memory2_id: memB.id,
+        confidence: 0.8,
+        reason: 'Test conflict'
       });
 
       const conflicts = getConflicts(db);
 
       expect(conflicts.length).toBeGreaterThan(0);
-      expect(conflicts[0].conflictId).toBe(conflictId);
+      expect(conflicts[0].conflictId).toBeDefined();
       expect(conflicts[0].memories.length).toBe(2);
     });
 
-    it('should group conflicts by conflict ID', () => {
-      const conflict1 = 'conflict_1';
-      const conflict2 = 'conflict_2';
+    it('should return multiple contradictions', () => {
+      const memA1 = createMemory(db, { content: 'Memory A1' });
+      const memA2 = createMemory(db, { content: 'Memory A2' });
+      const memB1 = createMemory(db, { content: 'Memory B1' });
+      const memB2 = createMemory(db, { content: 'Memory B2' });
 
-      createMemory(db, {
-        content: 'Memory A1',
-        tags: [conflict1, 'has-conflict']
+      createContradiction(db, {
+        memory1_id: memA1.id,
+        memory2_id: memA2.id,
+        confidence: 0.7,
+        reason: 'Conflict 1'
       });
 
-      createMemory(db, {
-        content: 'Memory A2',
-        tags: [conflict1, 'has-conflict']
-      });
-
-      createMemory(db, {
-        content: 'Memory B1',
-        tags: [conflict2, 'has-conflict']
-      });
-
-      createMemory(db, {
-        content: 'Memory B2',
-        tags: [conflict2, 'has-conflict']
+      createContradiction(db, {
+        memory1_id: memB1.id,
+        memory2_id: memB2.id,
+        confidence: 0.6,
+        reason: 'Conflict 2'
       });
 
       const conflicts = getConflicts(db);
