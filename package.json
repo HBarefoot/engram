@@ -1,6 +1,6 @@
 {
   "name": "@hbarefoot/engram",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Persistent memory for AI agents. SQLite for agent state.",
   "type": "module",
   "main": "src/index.js",
