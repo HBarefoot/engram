@@ -25,6 +25,8 @@ export default function Health() {
   const [cleanResult, setCleanResult] = useState<string | null>(null);
   const [confirmStale, setConfirmStale] = useState(false);
   const [confirmMerge, setConfirmMerge] = useState(false);
+  const [confirmNeverRecalled, setConfirmNeverRecalled] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   async function loadData() {
     setLoading(true);
@@ -72,6 +74,43 @@ export default function Health() {
         setCleanResult(`Error: ${err instanceof Error ? err.message : err}`);
       } finally {
         setCleaning(false);
+      }
+    })();
+  }
+
+  function handleCleanNeverRecalled() {
+    if (!neverRecalled || neverRecalled.items.length === 0) return;
+    if (!confirmNeverRecalled) {
+      setConfirmNeverRecalled(true);
+      setTimeout(() => setConfirmNeverRecalled(false), 5000);
+      return;
+    }
+    setConfirmNeverRecalled(false);
+    setCleaning(true);
+    (async () => {
+      try {
+        const ids = neverRecalled.items.map((m) => m.id);
+        const result = await api.bulkDeleteMemories(ids);
+        setCleanResult(`Deleted ${result.deleted} never-recalled memories`);
+        loadData();
+      } catch (err) {
+        setCleanResult(`Error: ${err instanceof Error ? err.message : err}`);
+      } finally {
+        setCleaning(false);
+      }
+    })();
+  }
+
+  function handleDeleteSingle(id: string) {
+    setDeletingId(id);
+    (async () => {
+      try {
+        await api.deleteMemory(id);
+        loadData();
+      } catch (err) {
+        setCleanResult(`Error deleting memory: ${err instanceof Error ? err.message : err}`);
+      } finally {
+        setDeletingId(null);
       }
     })();
   }
@@ -207,6 +246,13 @@ export default function Health() {
             {cleaning ? "Cleaning..." : confirmStale ? "Click again to confirm" : `Clean ${stale?.count || 0} stale memories`}
           </button>
           <button
+            onClick={handleCleanNeverRecalled}
+            disabled={cleaning || !neverRecalled?.count}
+            className="px-4 py-2 text-sm font-medium rounded-[10px] bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-800 dark:hover:bg-orange-900/40 transition-colors"
+          >
+            {cleaning ? "Cleaning..." : confirmNeverRecalled ? "Click again to confirm" : `Clean ${neverRecalled?.count || 0} never-recalled`}
+          </button>
+          <button
             onClick={handleMergeDuplicates}
             disabled={cleaning || !duplicates?.totalDuplicates}
             className="px-4 py-2 text-sm font-medium rounded-[10px] bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-red-900/20 dark:text-red-300 dark:border-red-800 dark:hover:bg-red-900/40 transition-colors"
@@ -238,6 +284,8 @@ export default function Health() {
           items={neverRecalled.items as never[]}
           columns={["content", "category", "daysSinceCreation"]}
           columnLabels={{ content: "Content", category: "Category", daysSinceCreation: "Days Old" }}
+          onDelete={handleDeleteSingle}
+          deletingId={deletingId}
         />
       )}
     </div>
@@ -276,12 +324,16 @@ function MemoryTable({
   items,
   columns,
   columnLabels,
+  onDelete,
+  deletingId,
 }: {
   title: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   items: Array<Record<string, any>>;
   columns: string[];
   columnLabels: Record<string, string>;
+  onDelete?: (id: string) => void;
+  deletingId?: string | null;
 }) {
   return (
     <div className="glass rounded-[10px] p-6 border border-gray-200/50 dark:border-gray-700/50">
@@ -297,6 +349,11 @@ function MemoryTable({
                   {columnLabels[col]}
                 </th>
               ))}
+              {onDelete && (
+                <th className="text-right py-2 px-3 text-xs font-medium uppercase w-20" style={{ color: "rgba(var(--text-secondary), 1)" }}>
+                  Actions
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -315,6 +372,17 @@ function MemoryTable({
                     )}
                   </td>
                 ))}
+                {onDelete && (
+                  <td className="py-2 px-3 text-right">
+                    <button
+                      onClick={() => onDelete(item.id as string)}
+                      disabled={deletingId === item.id}
+                      className="text-xs px-2 py-1 rounded text-red-600 hover:bg-red-50 hover:text-red-700 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300 transition-colors"
+                    >
+                      {deletingId === item.id ? "Deleting..." : "Delete"}
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
