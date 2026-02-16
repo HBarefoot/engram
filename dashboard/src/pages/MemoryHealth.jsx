@@ -14,6 +14,8 @@ export default function MemoryHealth() {
   const [error, setError] = useState(null);
   const [cleaning, setCleaning] = useState(false);
   const [cleanResult, setCleanResult] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const [confirmCleanNeverRecalled, setConfirmCleanNeverRecalled] = useState(false);
 
   async function loadData() {
     setLoading(true);
@@ -54,6 +56,38 @@ export default function MemoryHealth() {
       setCleanResult(`Error: ${err.message}`);
     } finally {
       setCleaning(false);
+    }
+  }
+
+  async function handleCleanNeverRecalled() {
+    if (!neverRecalled || neverRecalled.items.length === 0) return;
+    if (!confirmCleanNeverRecalled) {
+      setConfirmCleanNeverRecalled(true);
+      return;
+    }
+    setConfirmCleanNeverRecalled(false);
+    setCleaning(true);
+    try {
+      const ids = neverRecalled.items.map(m => m.id);
+      const result = await api.bulkDeleteMemories(ids);
+      setCleanResult(`Deleted ${result.deleted} never-recalled memories`);
+      loadData();
+    } catch (err) {
+      setCleanResult(`Error: ${err.message}`);
+    } finally {
+      setCleaning(false);
+    }
+  }
+
+  async function handleDeleteSingle(id) {
+    setDeletingId(id);
+    try {
+      await api.deleteMemory(id);
+      loadData();
+    } catch (err) {
+      setCleanResult(`Error deleting memory: ${err.message}`);
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -154,6 +188,23 @@ export default function MemoryHealth() {
             {cleaning ? 'Cleaning...' : `Clean ${stale?.count || 0} stale memories`}
           </button>
           <button
+            onClick={handleCleanNeverRecalled}
+            disabled={cleaning || !neverRecalled?.count}
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-800 dark:hover:bg-orange-900/40"
+          >
+            {cleaning ? 'Cleaning...' : confirmCleanNeverRecalled
+              ? `Confirm delete ${neverRecalled?.count || 0}?`
+              : `Clean ${neverRecalled?.count || 0} never-recalled`}
+          </button>
+          {confirmCleanNeverRecalled && (
+            <button
+              onClick={() => setConfirmCleanNeverRecalled(false)}
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600"
+            >
+              Cancel
+            </button>
+          )}
+          <button
             onClick={handleMergeDuplicates}
             disabled={cleaning || !duplicates?.totalDuplicates}
             className="px-4 py-2 text-sm font-medium rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-red-900/20 dark:text-red-300 dark:border-red-800 dark:hover:bg-red-900/40"
@@ -183,6 +234,8 @@ export default function MemoryHealth() {
           items={neverRecalled.items}
           columns={['content', 'category', 'daysSinceCreation']}
           columnLabels={{ content: 'Content', category: 'Category', daysSinceCreation: 'Days Old' }}
+          onDelete={handleDeleteSingle}
+          deletingId={deletingId}
         />
       )}
     </div>
@@ -219,7 +272,7 @@ function InsightCard({ title, count, description, color }) {
   );
 }
 
-function MemoryTable({ title, items, columns, columnLabels }) {
+function MemoryTable({ title, items, columns, columnLabels, onDelete, deletingId }) {
   const CATEGORY_COLORS = {
     preference: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
     fact: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
@@ -240,6 +293,11 @@ function MemoryTable({ title, items, columns, columnLabels }) {
                   {columnLabels[col]}
                 </th>
               ))}
+              {onDelete && (
+                <th className="text-right py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-20">
+                  Actions
+                </th>
+              )}
             </tr>
           </thead>
           <tbody>
@@ -258,6 +316,17 @@ function MemoryTable({ title, items, columns, columnLabels }) {
                     )}
                   </td>
                 ))}
+                {onDelete && (
+                  <td className="py-2 px-3 text-right">
+                    <button
+                      onClick={() => onDelete(item.id)}
+                      disabled={deletingId === item.id}
+                      className="text-xs px-2 py-1 rounded text-red-600 hover:bg-red-50 hover:text-red-700 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300"
+                    >
+                      {deletingId === item.id ? 'Deleting...' : 'Delete'}
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
