@@ -64,15 +64,18 @@ program
       const f = await loadFormat();
       const chalk = (await import('chalk')).default;
       const config = loadConfig(options.config);
-      const port = parseInt(options.port);
+      const requestedPort = parseInt(options.port);
 
       f.printHeader(version);
 
-      f.info(`REST API   ${chalk.cyan(`http://localhost:${port}`)}`);
-      f.info(`Dashboard  ${chalk.cyan(`http://localhost:${port}`)}`);
-      console.log('');
+      const { port: actualPort } = await startRESTServer(config, requestedPort);
 
-      await startRESTServer(config, port);
+      if (actualPort !== requestedPort) {
+        console.log(chalk.yellow(`⚠  Port ${requestedPort} was in use — using ${actualPort} instead.`));
+      }
+      f.info(`REST API   ${chalk.cyan(`http://localhost:${actualPort}`)}`);
+      f.info(`Dashboard  ${chalk.cyan(`http://localhost:${actualPort}`)}`);
+      console.log('');
 
       // Keep process alive
       process.on('SIGINT', () => {

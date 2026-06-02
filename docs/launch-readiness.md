@@ -66,7 +66,11 @@ _To be filled during P4. Document anything that surprises a first-time installer
 
 Full breakdown at [`docs/competitive-intel.md`](competitive-intel.md). Headline finding from session 3:
 
-**The `engrams` package was renamed to `@sunriselabs/lodis`** (v0.6.0). The competitor we were worried about *is also in-process npx*, uses the same SQLite + all-MiniLM-L6-v2 stack, and ships 40 MCP tools to Engram's 6. The "in-process, no infra" wedge is no longer unique — Engram's honest differentiation now lives in:
+**The `engrams` package was renamed to `@sunriselabs/lodis`** (v0.6.0). The competitor we were worried about *is also in-process npx*, uses the same SQLite + all-MiniLM-L6-v2 stack, and ships 40 MCP tools to Engram's 6.
+
+**Port collision mitigation — DONE (2026-06-02):** Both Engram and Lodis default REST/dashboard to `localhost:3838`. Engram's `startRESTServer` (`src/server/rest.js`) now auto-falls back to the next available port in the range `[port, port+4]` when the requested port is taken. Logs a `WARN` on fallback; the CLI prints a yellow `⚠` and the actual chosen URL. Default port stays `3838` (Engram established it first).
+
+The "in-process, no infra" wedge is no longer unique — Engram's honest differentiation now lives in:
 
 - **Stability** (v1.4.x vs Lodis v0.5.x)
 - **Automatic secret detection on every write** (Lodis has `memory_scrub` as an opt-in tool only)

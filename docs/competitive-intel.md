@@ -156,7 +156,7 @@ Both are honest. The README comparison table should pivot toward feature/safety 
 
 ## Action items
 
-- ✅ Add Lodis as a column in the README comparison table (this commit)
+- ✅ Add Lodis as a column in the README comparison table (session 3 commit `d505068`)
+- ✅ Mitigate the localhost:3838 port collision — `startRESTServer` now auto-falls back to the next available port in `[port, port+4]` and logs the chosen port loudly. CLI prints a yellow warning when fallback fires. See `src/server/rest.js` `findAvailablePort` helper (session 4).
 - ⬜ Watch Lodis releases — if they add automatic secret detection or an Integration Wizard, refresh this doc
 - ⬜ Consider shipping a Claude Code plugin for Engram (parallel to Lodis's `lodis@lodis-official` plugin) — Phase 2 work
-- ⬜ Add a port-conflict troubleshooting note to docs (both default to localhost:3838)
