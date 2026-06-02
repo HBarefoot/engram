@@ -21,10 +21,14 @@ Investigation summary (full details in plan file):
 
 - 🟡 **P1 — Version drift fix.** Staged: ✅ `package.json` bumped 1.4.2 → 1.4.6, ✅ `CONTRIBUTING.md` versioning policy added ("npm + desktop together, dashboard decoupled"). ⬜ Pending: publish `@hbarefoot/engram@1.4.6` to npm (needs 2FA from owner).
 - ✅ **P2 — Ghost reference grep.** Fixed: `src/server/mcp.js:19` (4→6 tools), `docs/ARCHITECTURE.md:314` (4→6 tools), `docs/api.md:242` (recall formula updated to `0.45/0.15/0.15/0.05 + 0.10 feedback + fts_boost`). `CLAUDE.md` was already synced earlier. README.md / examples/ checked — no stale references found. Notion pages still need pruning (out-of-repo task).
-- ⬜ **P3 — Minimum MCP server tests.** New: `test/server/mcp.test.js`, `test/memory/feedback.test.js`, `test/memory/context.test.js`, `test/memory/contradiction.test.js`. Pattern: in-memory DB via `initDatabase(':memory:')`.
+- ✅ **P3 — Minimum MCP server tests.** Added: `test/server/mcp.test.js` (18 tests across all 6 MCP tools), `test/memory/feedback.test.js` (20), `test/memory/context.test.js` (16), `test/memory/contradiction.test.js` (16). Pattern: tmpdir-per-test, model cache seeded from `node_modules/@xenova/transformers/.cache`. Test count: 139 → 209.
 - ⬜ **P4 — Cold install dry-run.** Fresh tmpdir → `npm i -g @hbarefoot/engram` → `engram start` → Claude Code connect → all 6 MCP tools round-trip. Document rough edges in this file.
 
-**Test/lint baseline (2026-06-02 after P1+P2 edits):** 139/139 tests pass, 0 lint errors, 19 pre-existing warnings.
+**Test/lint baseline (2026-06-02 after P1–P3):** 209/209 tests pass, 0 lint errors, 19 pre-existing warnings.
+
+## Code quirks surfaced during testing
+
+- **`resolveContradiction` returns `null` for `keep_first` / `keep_second`** (`src/memory/store.js:805`). The `contradictions` table has `ON DELETE CASCADE` on both memory FKs, so when the resolve action deletes one of the memories, the contradiction row is also cascaded away. The function's final `getContradiction(db, id)` then returns null even though the side effect succeeded. The REST endpoint at `POST /api/contradictions/:id/resolve` (`src/server/rest.js:509`) should be reviewed to confirm it handles the null return correctly — otherwise the caller sees a misleading 404-like response on a successful resolve. Not a hard bug but worth a follow-up. Tests document the current behavior.
 
 ## Business model decision (Days 4–5)
 
