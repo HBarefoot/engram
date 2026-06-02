@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import fs from 'fs';
+import net from 'net';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { loadConfig, getDatabasePath, getModelsPath } from '../config/index.js';
@@ -838,18 +839,70 @@ export function createRESTServer(config) {
 }
 
 /**
- * Start the REST API server
+ * Probe whether a port is free to bind on 127.0.0.1.
+ * @param {number} port - Port to probe
+ * @returns {Promise<boolean>} True if free
+ */
+function probePort(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', () => resolve(false));
+    server.once('listening', () => {
+      server.close(() => resolve(true));
+    });
+    server.listen(port, '127.0.0.1');
+  });
+}
+
+/**
+ * Find the first available port starting from `startPort`, trying up to
+ * `attempts` consecutive ports. Mitigates collisions with other services
+ * that default to the same port (e.g. Lodis also uses 3838).
+ * @param {number} startPort - First port to try
+ * @param {number} [attempts=5] - Max sequential attempts
+ * @returns {Promise<number>} First available port in the range
+ * @throws {Error} When all attempts are exhausted
+ */
+export async function findAvailablePort(startPort, attempts = 5) {
+  for (let i = 0; i < attempts; i++) {
+    const candidate = startPort + i;
+    if (await probePort(candidate)) {
+      return candidate;
+    }
+  }
+  const endPort = startPort + attempts - 1;
+  throw new Error(
+    `No available port in range ${startPort}-${endPort}. ` +
+    'Pass --port <other> or edit "port" in ~/.engram/config.json.'
+  );
+}
+
+/**
+ * Start the REST API server.
+ *
+ * On EADDRINUSE, auto-falls back to the next available port in the range
+ * [port, port+4]. Returns the actual bound port so the caller can print
+ * the correct URL.
+ *
  * @param {Object} config - Engram configuration
- * @param {number} port - Port to listen on
- * @returns {Promise<Object>} Running Fastify instance
+ * @param {number} [port=3838] - Requested port
+ * @returns {Promise<{fastify: Object, port: number}>} Fastify instance + bound port
  */
 export async function startRESTServer(config, port = 3838) {
   try {
     const fastify = createRESTServer(config);
+    const boundPort = await findAvailablePort(port, 5);
 
-    await fastify.listen({ port, host: '127.0.0.1' });
+    if (boundPort !== port) {
+      logger.warn('Requested port unavailable, falling back', {
+        requested: port,
+        bound: boundPort
+      });
+    }
 
-    logger.info('REST API server started', { port, url: `http://localhost:${port}` });
+    await fastify.listen({ port: boundPort, host: '127.0.0.1' });
+
+    logger.info('REST API server started', { port: boundPort, url: `http://localhost:${boundPort}` });
 
     // Set TRANSFORMERS_CACHE early so isModelAvailable() can find cached models
     const modelsPath = getModelsPath(config);
@@ -866,7 +919,7 @@ export async function startRESTServer(config, port = 3838) {
       logger.warn('Failed to import embedding module for pre-warm', { error: err?.message ?? String(err) });
     });
 
-    return fastify;
+    return { fastify, port: boundPort };
   } catch (error) {
     logger.error('Failed to start REST server', { error: error.message });
     throw error;
