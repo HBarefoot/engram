@@ -20,24 +20,32 @@ Your AI agent now has long-term memory. Two minutes, no setup, no cloud.
 - 🧠 **In-process** — runs inside your agent's stack. No separate server to deploy, no IPC overhead, nothing to fork.
 - 📴 **Offline** — local SQLite + bundled embeddings (~23 MB). No API keys, no data leaving your machine.
 - 🔌 **MCP-native** — first-class Model Context Protocol integration with Claude Desktop, Claude Code, Cursor, Windsurf, and Cline.
+- 🔐 **Safety by default** — automatic secret detection on every write. API keys, private keys, connection strings, JWTs blocked before they hit the database.
 
 ---
 
 ## Why Engram?
 
-Every other agent-memory product is a service you run alongside your agent. Engram is a package you embed inside it.
+Most agent-memory products are services you run alongside your agent — Postgres, Docker, cloud accounts, API keys. Engram embeds *inside* your agent's process: a focused, stable npm package with practical guardrails.
 
-| | **Engram** | **Mem0 / OpenMemory** | **Zep** | **Letta** |
-|---|---|---|---|---|
-| **Runs as** | `npm` package, in-process | Cloud SaaS *or* OpenMemory Docker stack | Self-hosted server + Postgres + Graphiti | Self-hosted server + Postgres |
-| **Infra to operate** | None | Cloud account *or* multi-container Docker compose | Docker + Postgres (+ Graphiti for graph features) | Docker + Postgres |
-| **Cold-install footprint** | ~23 MB (one model file) | Hundreds of MB of container images (self-hosted) | Hundreds of MB | Hundreds of MB |
-| **Works offline** | ✅ By design | ❌ Cloud / ✅ if self-hosted | ❌ Calls external LLM/embedding providers | ❌ Calls external LLM provider |
-| **MCP-native interface** | ✅ Primary | 🟡 OpenMemory ships an MCP server | ❌ REST/SDK | ❌ REST/SDK |
-| **Memory improves over time** | ✅ Feedback loop + contradiction detection + consolidation | 🟡 No first-class feedback API | 🟡 No first-class feedback API | 🟡 No first-class feedback API |
-| **LLM-powered extraction** | ❌ Rule-based by default (Layer 1 LLM hook documented) | ✅ Built-in | ✅ Built-in | ✅ Built-in |
+| | **Engram** | **Lodis** | **Mem0 / OpenMemory** | **Zep** | **Letta** |
+|---|---|---|---|---|---|
+| **Maturity** | v1.4.x, stable | v0.5.x, early | mature / SaaS | v0.x | v0.x |
+| **Infra to operate** | None (npm package) | None (npx package) | Cloud account *or* multi-container Docker | Docker + Postgres + Graphiti | Docker + Postgres |
+| **Install footprint** | ~23 MB | ~22 MB | Hundreds of MB containers (self-hosted) | Hundreds of MB | Hundreds of MB |
+| **Works offline** | ✅ | ✅ | ❌ Cloud / ✅ if self-hosted | ❌ External embed provider | ❌ External LLM provider |
+| **MCP-native** | ✅ Primary | ✅ Primary | 🟡 OpenMemory ships an MCP server | ❌ REST/SDK | ❌ REST/SDK |
+| **REST API alongside MCP** | ✅ | ❌ MCP-only | ✅ Cloud | ✅ | ✅ |
+| **Surface area** | 6 tools, 5 categories | 40 tools, 14 entity types + 4 permanence tiers + temporal supersession | varies | varies | varies |
+| **Automatic secret detection** | ✅ Blocks on every write | 🟡 `memory_scrub` opt-in tool | 🟡 Not first-class | 🟡 Not first-class | 🟡 Not first-class |
+| **Agent auto-discovery** | ✅ Dashboard Integration Wizard | ❌ Manual config | ❌ | ❌ | ❌ |
+| **Desktop app** | ✅ macOS Tauri menu bar | ❌ | ❌ | ❌ | ❌ |
+| **LLM-powered extraction** | ❌ Rule-based (Layer 1 hook documented) | ❌ LLM-free read/write | ✅ Built-in | ✅ Built-in | ✅ Built-in |
+| **Feedback / contradiction workflow** | ✅ Side-by-side conflict-resolution UI + feedback loop | 🟡 Programmatic correct/confirm/supersede tools | 🟡 No first-class feedback | 🟡 | 🟡 |
 
-*Sources: [mem0.ai](https://mem0.ai/), [github.com/getzep/zep](https://github.com/getzep/zep), [github.com/letta-ai/letta](https://github.com/letta-ai/letta). Where competitors lead — LLM-powered extraction in particular — we list it honestly. Engram's `llm.*` config block is the documented hook for opt-in LLM extraction; the default zero-config path uses rule-based extraction so the package stays offline and infra-free.*
+*Sources: [@sunriselabs/lodis](https://www.npmjs.com/package/@sunriselabs/lodis), [Sunrise-Labs-Dot-AI/engrams](https://github.com/Sunrise-Labs-Dot-AI/engrams), [mem0.ai](https://mem0.ai/), [github.com/getzep/zep](https://github.com/getzep/zep), [github.com/letta-ai/letta](https://github.com/letta-ai/letta). See [`docs/competitive-intel.md`](docs/competitive-intel.md) for the full breakdown. Where competitors lead — LLM-powered extraction in Mem0/Zep/Letta, broader feature surface in Lodis — we list it honestly. Engram's `llm.*` config block is the documented hook for opt-in LLM extraction; the default zero-config path uses rule-based extraction so the package stays offline and infra-free.*
+
+**TL;DR — when each one fits.** Pick **Engram** if you want a focused, stable memory layer with practical guardrails (secret detection, agent auto-discovery, desktop app) and a simple 5-category mental model. Pick **Lodis** if you want a knowledge-graph-style memory with 14 entity types and temporal supersession. Pick **Mem0/Zep/Letta** if you need LLM-powered extraction and don't mind operating infrastructure for it.
 
 ---
 

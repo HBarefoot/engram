@@ -36,9 +36,9 @@ Investigation summary (full details in plan file):
 
 ## Analytics groundwork (Days 5–7)
 
-- ⬜ Weekly npm download snapshot (script writing to CSV).
-- ⬜ GitHub Insights traffic baseline (today, pre-README change).
-- ⬜ UTM tags on every link from README / Notion / launch posts.
+- ✅ Weekly npm download snapshot — `scripts/track-downloads.sh` writes to `stats/downloads.csv`. Manual run for now; wire to cron in a later session.
+- ✅ GitHub Insights traffic baseline — captured in `stats/baseline-2026-06-02.json` (4 stars, 1 fork, 29 weekly downloads, v1.4.2 on npm at snapshot time).
+- ⬜ UTM tags — deferred. README has few attribution-worthy outbound links; UTM strategy is more useful for launch posts (Show HN, Reddit, etc.) in Phase 2.2.
 
 ## Phase 1 — Positioning
 
@@ -62,6 +62,17 @@ Investigation summary (full details in plan file):
 
 _To be filled during P4. Document anything that surprises a first-time installer._
 
-## Competitive intel (surfaced during name hunt)
+## Competitive intel
 
-- **`sunriselabs/engrams`** (npm: `engrams@0.5.1`, james@sunriselabs.ai) — direct competitor, MCP memory layer, active. Worth a 15-min scout to understand architecture before the Phase 1.5 comparison table is finalized; if they're also in-process zero-infra the wedge needs to shift.
+Full breakdown at [`docs/competitive-intel.md`](competitive-intel.md). Headline finding from session 3:
+
+**The `engrams` package was renamed to `@sunriselabs/lodis`** (v0.6.0). The competitor we were worried about *is also in-process npx*, uses the same SQLite + all-MiniLM-L6-v2 stack, and ships 40 MCP tools to Engram's 6. The "in-process, no infra" wedge is no longer unique — Engram's honest differentiation now lives in:
+
+- **Stability** (v1.4.x vs Lodis v0.5.x)
+- **Automatic secret detection on every write** (Lodis has `memory_scrub` as an opt-in tool only)
+- **Agent auto-discovery + Integration Wizard** (Lodis has manual config)
+- **REST API alongside MCP** (Lodis is MCP-only)
+- **macOS Tauri desktop app**
+- **Smaller surface area** — 6 tools, 5 categories; easier to learn
+
+Comparison table in `README.md` updated 2026-06-02 to reflect this honestly.

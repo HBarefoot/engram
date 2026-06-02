@@ -1,0 +1,46 @@
+{
+  "snapshot_at": "2026-06-02T15:30:00Z",
+  "purpose": "Pre-Phase-1 reference point. Captured before the README rewrite, name claim, and pre-flight hardening (sessions 1-2 of the growth plan) shipped. All Phase 1 conversion metrics measure against this baseline.",
+  "npm": {
+    "package": "@hbarefoot/engram",
+    "version_at_snapshot": "1.4.2",
+    "weekly_downloads_2026-05-25_to_2026-05-31": 29,
+    "weekly_downloads_per_day": {
+      "2026-05-25": 14,
+      "2026-05-26": 1,
+      "2026-05-27": 10,
+      "2026-05-28": 0,
+      "2026-05-29": 2,
+      "2026-05-30": 0,
+      "2026-05-31": 2
+    },
+    "source": "https://api.npmjs.org/downloads/range/last-week/@hbarefoot/engram"
+  },
+  "github": {
+    "repo": "HBarefoot/engram",
+    "created_at": "2026-02-03T03:47:12Z",
+    "stargazers": 4,
+    "forks": 1,
+    "watchers": 1,
+    "open_issues": 0,
+    "open_pull_requests": 0,
+    "source": "gh repo view HBarefoot/engram --json stargazerCount,forkCount,watchers,issues,pullRequests"
+  },
+  "tests": {
+    "total": 209,
+    "test_files": 13,
+    "lint_errors": 0,
+    "lint_warnings": 19
+  },
+  "competitive": {
+    "engrams_renamed_to_lodis": true,
+    "lodis_latest_version_at_snapshot": "0.5.1",
+    "lodis_npm_package": "@sunriselabs/lodis",
+    "note": "Lodis (formerly engrams) is the closest direct competitor in the in-process MCP memory layer category. See docs/competitive-intel.md."
+  },
+  "memgram_placeholder": {
+    "claimed_at": "2026-06-02T15:29:54Z",
+    "version": "0.0.1",
+    "url": "https://www.npmjs.com/package/memgram"
+  }
+}
