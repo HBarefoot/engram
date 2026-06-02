@@ -46,9 +46,14 @@ STORAGE: ~/.engram/memory.db (SQLite) | config.json | models/
 - **extract/rules.js** - Zero-dependency rule-based fact extraction
 - **extract/secrets.js** - Secret/sensitive data detection (CRITICAL: never store API keys)
 - **embed/index.js** - Embedding generation + model management (lazy download)
-- **server/mcp.js** - MCP server with 4 tools (remember, recall, forget, status)
+- **memory/feedback.js** - Per-memory helpful/unhelpful votes; derives `feedback_score`, may auto-adjust confidence
+- **memory/context.js** - Backs the `engram_context` MCP tool; markdown/xml/json/plain output with token budgeting
+- **memory/health.js**, **memory/analytics.js** - Back the dashboard Health/Statistics pages and `/api/analytics/*` endpoints
+- **server/mcp.js** - MCP server with 6 tools (remember, recall, forget, feedback, context, status)
 - **server/rest.js** - Fastify REST API + dashboard serving
-- **discover/agents.js** - Auto-detect Claude Code, Cursor, Windsurf, etc.
+- **import/** - Document import: `wizard.js`, `index.js`, and 8 parsers under `parsers/` (cursorrules, claude, package, git, ssh, shell, obsidian, env)
+
+Agent auto-discovery is **not** in `src/discover/` — it lives in the dashboard (`IntegrationWizard`, `PlatformSelector`, `ConfigGenerator`) and is served by the REST endpoint `GET /api/installation-info` plus the `/api/import/*` flow.
 
 ## Development Commands
 
@@ -74,44 +79,76 @@ engram start                  # Start server
 engram start --mcp-only       # MCP server only
 engram start --port 3838      # Custom port
 
-engram remember "content"     # Store a memory
-engram recall "query"         # Recall memories
+engram remember "content"     # Store a memory (-c category -e entity --confidence -n namespace)
+engram recall "query"         # Recall memories (-l limit -c category -n namespace --threshold)
 engram forget <id>            # Delete a memory
-engram list                   # List all memories
+engram list                   # List all memories (-l limit --offset -c category -n namespace)
 engram status                 # Health check
 
-engram import <file>          # Import from file
-engram export                 # Export to JSON
-
-engram agents                 # List detected agents
-engram connect <agent-id>     # Write MCP config
-engram consolidate            # Run consolidation
+engram consolidate            # Run consolidation (--no-duplicates|--no-contradictions|--no-decay|--cleanup-stale)
+engram conflicts              # List unresolved contradictions
+engram export-context         # Export a curated context block (-o -f markdown|claude|txt|json -c --min-confidence ...)
+engram import                 # Import from local sources (-s source --dry-run -n namespace -p paths)
 ```
+
+Agent connection (`engram agents` / `engram connect <agent-id>`) is **not** a CLI subcommand — drive it from the dashboard's Agents/Import pages or the REST `/api/import/*` endpoints.
 
 ## Database Schema
 
-Located at `~/.engram/memory.db`. Key table:
+Located at `~/.engram/memory.db` (WAL mode, foreign keys on).
 
 ```sql
 memories (
   id TEXT PRIMARY KEY,              -- UUIDv4
   content TEXT NOT NULL,            -- Memory text
   entity TEXT,                      -- What/who this is about
-  category TEXT DEFAULT 'fact',     -- preference|fact|pattern|decision|outcome
-  confidence REAL DEFAULT 0.8,      -- 0.0 to 1.0
+  category TEXT NOT NULL DEFAULT 'fact', -- preference|fact|pattern|decision|outcome
+  confidence REAL NOT NULL DEFAULT 0.8,  -- 0.0 to 1.0
   embedding BLOB,                   -- Float32Array as Buffer
-  source TEXT DEFAULT 'manual',     -- Which agent created this
+  source TEXT DEFAULT 'manual',     -- Which agent/source created this
   namespace TEXT DEFAULT 'default', -- Project/scope isolation
   tags TEXT DEFAULT '[]',           -- JSON array
-  created_at INTEGER,               -- Unix timestamp (ms)
-  updated_at INTEGER,
+  created_at INTEGER NOT NULL,      -- Unix timestamp (ms)
+  updated_at INTEGER NOT NULL,
   last_accessed INTEGER,
   access_count INTEGER DEFAULT 0,
-  decay_rate REAL DEFAULT 0.01
+  decay_rate REAL DEFAULT 0.01,
+  feedback_score REAL DEFAULT 0.0   -- Aggregated helpful/unhelpful score, [-1, 1]
+)
+
+memory_feedback (
+  id TEXT PRIMARY KEY,
+  memory_id TEXT NOT NULL,          -- FK → memories.id ON DELETE CASCADE
+  helpful INTEGER NOT NULL,         -- 1 = helpful, 0 = unhelpful
+  context TEXT,
+  created_at INTEGER NOT NULL
+)
+
+contradictions (
+  id TEXT PRIMARY KEY,
+  memory1_id TEXT NOT NULL,         -- FK → memories.id ON DELETE CASCADE
+  memory2_id TEXT NOT NULL,         -- FK → memories.id ON DELETE CASCADE
+  confidence REAL NOT NULL DEFAULT 0.5,
+  reason TEXT,
+  category TEXT,
+  entity TEXT,
+  status TEXT NOT NULL DEFAULT 'unresolved', -- unresolved|resolved|dismissed
+  detected_at INTEGER NOT NULL,
+  resolved_at INTEGER,
+  resolution_action TEXT            -- keep_first|keep_second|keep_both|dismiss
+)
+
+meta (
+  key TEXT PRIMARY KEY,             -- kv table for one-shot migration flags
+  value TEXT                        --   e.g. 'contradictions_migrated' -> ISO date
 )
 ```
 
-Uses FTS5 for full-text search with automatic trigger-based sync.
+Uses FTS5 (`memories_fts` contentless mirror over content/entity/tags) with three triggers (`memories_ai/ad/au`) that keep the index in sync on insert/delete/update.
+
+Nine indexes on `memories` (category, entity, namespace, confidence, created_at, last_accessed, feedback_score, namespace+created_at composite, plus feedback FK) and four on `contradictions` (status, memory1, memory2, detected_at).
+
+A one-shot migration (`migrateTagConflicts` in `memory/store.js`) rolls legacy `conflict_*` tag pairs into the `contradictions` table on first run, gated by the `meta` table.
 
 ## Memory Categories
 
@@ -123,52 +160,48 @@ Uses FTS5 for full-text search with automatic trigger-based sync.
 
 ## Recall Algorithm
 
-Hybrid scoring system:
+Hybrid scoring system (`src/memory/recall.js`):
 1. Generate embedding for query
-2. Fetch candidates (FTS5 top 20 + all embeddings in namespace)
-3. Score each: `(similarity×0.5) + (recency×0.15) + (confidence×0.2) + (access×0.05) + fts_boost`
-4. Filter by threshold (default 0.3)
-5. Return top N (default 5)
-6. Update last_accessed and access_count
+2. Fetch candidates (FTS5 top 20 ∪ all in-namespace embeddings, optionally filtered by `time_filter`)
+3. Score each: `(similarity×0.45) + (recency×0.15) + (confidence×0.15) + (access×0.05) + (feedback×0.10) + fts_boost`
+   - `similarity` = cosine of query embedding vs memory embedding
+   - `recency` = `1 / (1 + days_since_last_access × decay_rate)`
+   - `access` = `min(access_count / 10, 1)`
+   - `feedback` = `memory.feedback_score` (raw `[-1, 1]`) normalized to `[0, 1]` via `(x+1)/2`
+   - `fts_boost` = 0.1 if the memory also appeared in the FTS top-20, else 0
+4. Filter by category (if given) and by `threshold` (default 0.3)
+5. Sort descending, return top N (default 5)
+6. Update `last_accessed` and `access_count` for returned memories
 
-## Implementation Order
+Graceful fallback: if embedding generation fails, recall falls back to FTS-only with a position-based score. Returned arrays carry ad-hoc `timeRange` and `totalInRange` properties when a `time_filter` was applied.
 
-**Phase 1: Core Memory Engine**
-1. config/index.js - Config management
-2. utils/id.js, utils/logger.js
-3. memory/store.js - SQLite init, migrations, CRUD
-4. extract/secrets.js - Secret detection
-5. extract/rules.js - Category detection, entity extraction
-6. Write tests
+## Implementation Order (historical)
 
-**Phase 2: Embedding & Recall**
-7. embed/index.js - Model download, embedding generation
-8. memory/recall.js - Hybrid search
-9. memory/consolidate.js - Duplicate detection, decay
-10. Write tests
+The original phased build plan (Phase 1 Core → Phase 6 Polish) has been delivered. The project is now in post-1.4 maintenance: feedback loop, contradiction detection + resolution UI, analytics endpoints, health dashboard, import wizard with 8 parsers, and a Tauri desktop wrapper have all shipped on top of the original scope. Treat this section as context for "why is the code laid out this way", not as a TODO.
 
-**Phase 3: MCP Server**
-11. server/mcp.js - 4 MCP tools (remember, recall, forget, status)
-12. bin/engram.js - CLI with --mcp-only
-13. Test with Claude Code
+## Contradictions
 
-**Phase 4: REST API + CLI**
-14. server/rest.js - All REST endpoints
-15. Complete CLI commands
-16. discover/agents.js - Agent detection
-17. import/index.js - Document import
-18. Write tests
+When two memories about the same entity/category conflict, consolidation writes a row into the `contradictions` table rather than tagging memories with a `conflict_*` tag (legacy approach). The dashboard "Conflicts" page surfaces unresolved rows and lets the user resolve each one:
 
-**Phase 5: Web Dashboard**
-19. Scaffold dashboard/ with Vite + React + Tailwind
-20. Build components (SearchBar, MemoryList, MemoryEditor, etc.)
-21. Wire to REST API
-22. Build and integrate into Fastify
+- `keep_first` — delete `memory2`, mark contradiction `resolved`
+- `keep_second` — delete `memory1`, mark contradiction `resolved`
+- `keep_both` — leave both memories, mark contradiction `resolved`
+- `dismiss` — leave both, mark contradiction `dismissed`
 
-**Phase 6: Polish**
-23. README.md, docs/, examples/
-24. Final testing
-25. npm publish prep
+`resolveContradiction` in `memory/store.js` performs the side-effect deletes. The MCP server itself does **not** expose contradiction resolution — drive it from the dashboard or `POST /api/contradictions/:id/resolve`.
+
+## REST API Surface (`src/server/rest.js`)
+
+Fastify, mounted at `localhost:3838` by default. Endpoints (paths only; see file for schemas):
+
+- **System**: `GET /health`, `GET /api/status`, `GET /api/installation-info`
+- **Memories CRUD**: `POST /api/memories`, `GET /api/memories`, `POST /api/memories/search`, `GET /api/memories/:id`, `DELETE /api/memories/:id`, `POST /api/memories/bulk-delete`
+- **Maintenance**: `POST /api/consolidate`, `GET /api/conflicts` (legacy tag-based view)
+- **Contradictions**: `GET /api/contradictions`, `POST /api/contradictions/:id/resolve`, `GET /api/contradictions/count`
+- **Analytics**: `GET /api/analytics/{overview,stale,never-recalled,duplicates,trends}`
+- **Export**: `POST /api/export/static`
+- **Import**: `GET /api/import/sources`, `POST /api/import/scan`, `POST /api/import/commit`
+- **Static**: dashboard served from `dashboard/dist` via `@fastify/static`
 
 ## Critical Quality Rules
 
@@ -185,14 +218,16 @@ Hybrid scoring system:
 
 ## MCP Server Details
 
-Primary interface for AI agents. Implements 4 tools via stdio transport:
+Primary interface for AI agents. Implements 6 tools via stdio transport (`src/server/mcp.js`):
 
-- **engram_remember** - Store a memory with category, entity, confidence, namespace
-- **engram_recall** - Retrieve relevant memories by semantic query
-- **engram_forget** - Delete a memory by ID
-- **engram_status** - Health check and stats
+- **engram_remember** — Store a memory with `content`, optional `category|entity|confidence|namespace|tags|force`. Runs secret detection (`validateContent`), auto-extracts category/entity if missing, generates an embedding, then `createMemoryWithDedup` which can return `created`, `merged` (≥0.92 cosine), or `duplicate` (≥0.95 cosine, rejected unless `force: true`).
+- **engram_recall** — Retrieve relevant memories by semantic query. Supports `query|limit|category|namespace|threshold|time_filter` (the latter accepts `after`/`before` ISO or relative strings, or a `period` shorthand like `last_week`).
+- **engram_forget** — Delete a memory by ID.
+- **engram_feedback** — Vote on a recalled memory's helpfulness (`memory_id` + `helpful: boolean` + optional `context`). Updates `feedback_score`; may adjust the memory's `confidence`.
+- **engram_context** — Pre-formatted context block for system-prompt injection. Supports `query?|namespace|limit|format: markdown|xml|json|plain|include_metadata|categories|max_tokens`.
+- **engram_status** — Health check + stats (memory counts by category/namespace, model status, config summary).
 
-Tool responses must return `{ content: [{ type: "text", text: "..." }] }` per MCP spec.
+Every handler is wrapped in a single outer try/catch that converts thrown errors into `{ content: [{ type: 'text', text: 'Error: …' }] }` rather than crashing the server. Tool responses always follow that MCP `content` shape. `SIGINT`/`SIGTERM` close the DB and exit cleanly.
 
 ## Secret Detection
 
@@ -207,6 +242,8 @@ The extract/secrets.js module MUST reject:
 Reject memory entirely or redact secret portions. Log warnings.
 
 ## Agent Auto-Discovery
+
+Implemented in the dashboard (`dashboard/src/components/IntegrationWizard.jsx`, `PlatformSelector.jsx`, `ConfigGenerator.jsx`, with platform data in `dashboard/src/data/platformConfigs.js`) and served by the REST endpoints `GET /api/installation-info` and `POST /api/import/{scan,commit}`. There is **no** `src/discover/agents.js`.
 
 Detects and connects to:
 - Claude Code (~/.claude/mcp.json)
@@ -225,23 +262,24 @@ Connection flow:
 
 ## File Structure Reference
 
-See [engram-build-prompt.md](engram-build-prompt.md) section 4 for complete file tree.
-
 Key directories:
-- `bin/` - CLI entry point
-- `src/` - Core implementation
-  - `server/` - MCP + REST
-  - `memory/` - Store, recall, consolidate
-  - `extract/` - Rules, secrets, LLM
-  - `embed/` - Embedding generation
-  - `discover/` - Agent detection
-  - `import/` - Document import
-  - `config/` - Configuration
-  - `utils/` - ID, tokens, logger
-- `dashboard/` - React web UI
-- `test/` - Vitest tests
-- `docs/` - Architecture and API docs
-- `examples/` - Usage examples
+- `bin/` — CLI entry point (`engram.js`)
+- `src/` — Core implementation
+  - `server/` — `mcp.js` (6 stdio tools) + `rest.js` (Fastify, serves dashboard static)
+  - `memory/` — `store.js`, `recall.js`, `consolidate.js`, `feedback.js`, `context.js`, `health.js`, `analytics.js`
+  - `extract/` — `rules.js` (category/entity extraction), `secrets.js` (secret detection)
+  - `embed/` — `index.js` (lazy `@xenova/transformers` loader, cosine similarity)
+  - `import/` — `index.js`, `wizard.js`, and `parsers/{cursorrules,claude,package,git,ssh,shell,obsidian,env}.js`
+  - `export/` — `static.js` (engram-context export)
+  - `config/` — Configuration loader
+  - `utils/` — `id.js`, `logger.js`, `time.js` (time-filter parser), `format.js`
+- `dashboard/` — React 18 + Vite + Tailwind. Pages: Dashboard, MemoryList, SearchMemories, Agents, Statistics, MemoryHealth, Contradictions, Download, ImportWizard. Agent auto-discovery lives here.
+- `desktop/` — Tauri v2 wrapper (own `package.json`, currently versioned ahead of npm)
+- `test/` — Vitest tests
+- `docs/` — Architecture, API, MCP setup, PM2 deployment guides
+- `examples/` — `api-client.js`, `basic-usage.js`
+- `scripts/build-sidecar.js` — Tauri sidecar compilation helper
+- `ecosystem.config.cjs` — PM2 process manager config
 
 ## Testing Strategy
 
@@ -256,14 +294,23 @@ Key directories:
 Located at `~/.engram/config.json`. All fields optional with defaults.
 
 Key settings:
-- `port` - REST API port (default: 3838)
-- `dataDir` - Storage location (default: ~/.engram)
-- `defaults.namespace` - Default memory namespace
-- `defaults.recallLimit` - Max recall results (default: 5)
-- `defaults.confidenceThreshold` - Minimum confidence (default: 0.3)
-- `embedding.model` - Embedding model name
-- `consolidation.enabled` - Auto-consolidation toggle
-- `security.secretDetection` - Secret detection toggle
+- `port` — REST API port (default: 3838)
+- `dataDir` — Storage location (default: ~/.engram)
+- `defaults.namespace` — Default memory namespace (default: `default`)
+- `defaults.recallLimit` — Max recall results (default: 5)
+- `defaults.confidenceThreshold` — Minimum confidence (default: 0.3)
+- `defaults.tokenBudget` — Soft token budget for context output (default: 500)
+- `defaults.maxRecallResults` — Hard upper bound on recall limit (default: 20)
+- `embedding.provider` — `local` (the only supported option; uses `@xenova/transformers`)
+- `embedding.model` — Embedding model name (default: `Xenova/all-MiniLM-L6-v2`)
+- `embedding.endpoint` — Reserved for remote-embedding providers; currently unused
+- `consolidation.enabled` — Auto-consolidation toggle (default: true)
+- `consolidation.intervalHours` — Consolidation cadence (default: 24)
+- `consolidation.duplicateThreshold` — Cosine threshold to treat as duplicate (default: 0.92)
+- `consolidation.decayEnabled` — Whether to apply confidence decay (default: true)
+- `security.secretDetection` — Secret detection toggle (default: true)
+- `security.auditLog` — Audit logging toggle (default: false)
+- `llm.*` — `provider`, `endpoint`, `model`, `apiKey`. **Layer 1 of the onion architecture** (opt-in LLM enhancement). Reserved for pointing at Ollama, LM Studio, or any OpenAI-compatible endpoint to unlock smarter extraction, consolidation, and contradiction detection. Currently unread by code — the default zero-config layer uses rule-based extraction only (`src/extract/rules.js`). Do **not** remove these fields; they are part of the documented design.
 
 ## Common Patterns
 
@@ -301,7 +348,7 @@ const id = randomUUID(); // Node.js built-in, no dependency
 ## Success Criteria
 
 - [ ] `npm install -g engram && engram start` works zero-config
-- [ ] Claude Code can connect and use all 4 MCP tools
+- [ ] Claude Code can connect and use all 6 MCP tools (remember, recall, forget, feedback, context, status)
 - [ ] Memories persist across sessions
 - [ ] Recall returns semantically relevant results
 - [ ] Dashboard works at localhost:3838

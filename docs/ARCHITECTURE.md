@@ -311,7 +311,7 @@ Built with Fastify for performance:
 Implements Model Context Protocol:
 
 - **Transport**: Stdio (stdin/stdout)
-- **Tools**: 4 MCP tools (remember, recall, forget, status)
+- **Tools**: 6 MCP tools (remember, recall, forget, feedback, context, status)
 - **Error Handling**: Structured error responses
 - **Database**: Lazy initialization on first request
 

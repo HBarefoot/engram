@@ -16,7 +16,7 @@ import * as logger from '../utils/logger.js';
 
 /**
  * MCP Server for Engram
- * Provides 4 tools: engram_remember, engram_recall, engram_forget, engram_status
+ * Provides 6 tools: engram_remember, engram_recall, engram_forget, engram_feedback, engram_context, engram_status
  */
 export class EngramMCPServer {
   constructor(config) {

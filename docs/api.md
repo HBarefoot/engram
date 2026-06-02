@@ -239,8 +239,10 @@ Search for relevant memories using hybrid search (embeddings + FTS + recency).
 
 **Scoring Formula:**
 ```
-final_score = (similarity × 0.5) + (recency × 0.15) + (confidence × 0.2) + (access × 0.05) + fts_boost
+final_score = (similarity × 0.45) + (recency × 0.15) + (confidence × 0.15) + (access × 0.05) + (feedback × 0.10) + fts_boost
 ```
+
+Where `feedback` is the memory's aggregate feedback score (from `memory_feedback` votes) normalized from `[-1, 1]` to `[0, 1]` via `(x+1)/2`, and `fts_boost` is `0.1` if the memory was also returned by the FTS5 top-20, else `0`.
 
 ---
 

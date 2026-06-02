@@ -235,6 +235,19 @@ describe('Memory Store', () => {
 - Update API documentation in docs/api.md
 - Keep documentation clear and concise
 
+## Versioning
+
+Engram ships in two parallel artifacts: the npm package (`@hbarefoot/engram`, root `package.json`) and the desktop app (`desktop/package.json`). **Bump them together** — no asymmetric releases. The `dashboard/package.json` version is decoupled because the dashboard is bundled into both artifacts at build time, not separately consumed.
+
+Release checklist for any version bump:
+
+1. Update `package.json` and `desktop/package.json` to the same version.
+2. Run `npm test` and `npm run lint` from the repo root.
+3. Build the dashboard (`npm run build`) and confirm it's included in the npm tarball (`npm publish --dry-run`).
+4. Commit, tag, push.
+5. Cut a GitHub Release — the `publish.yml` workflow auto-publishes to npm.
+6. Trigger the desktop build pipeline if user-visible changes ship to the Tauri app.
+
 ## Pull Request Process
 
 1. **Update Documentation**: Ensure README and docs reflect your changes
