@@ -1,6 +1,12 @@
-# GitHub Sponsors configuration
-# Uncomment and update when ready to accept sponsorships
+# Engram funding configuration.
+#
+# The Sponsor button only appears once the maintainer is enrolled in
+# GitHub Sponsors. Until enrollment is approved this entry is silent —
+# no errors, no broken UI. See:
+#   https://docs.github.com/en/sponsors/getting-started-with-github-sponsors
 
-# github: HBarefoot
+github: HBarefoot
 # ko_fi:
 # buy_me_a_coffee:
+# open_collective:
+# custom: ['https://...']

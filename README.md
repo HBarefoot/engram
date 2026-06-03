@@ -342,7 +342,7 @@ const results = await recallMemories(
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, the versioning policy (npm + desktop bump together), and the release checklist.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, the versioning policy (npm + desktop bump together), and the release checklist. The project's licensing and sustainability stance is in [BUSINESS_MODEL.md](BUSINESS_MODEL.md) — short version: pure OSS, MIT forever, no paywalls.
 
 ```bash
 git clone https://github.com/HBarefoot/engram.git
@@ -351,7 +351,12 @@ npm install
 npm run dev
 ```
 
-Issues and discussions are open. If Engram is useful to you, a GitHub star is the signal that tells me to keep shipping.
+If Engram is useful to you, here's how to help:
+
+- ⭐ **Star the repo** — the loudest signal that this is worth continuing.
+- 🐛 **Open an issue** — bug, feature request, or "we use Engram at \<company\> for \<thing\>" stories all welcome.
+- 💬 **Start a [discussion](https://github.com/HBarefoot/engram/discussions)** — design questions, integration ideas, "how would I…" — all good.
+- ❤️ **[Sponsor on GitHub](https://github.com/sponsors/HBarefoot)** — low-pressure way to support continued development. No tier-locked features; sponsorship goes straight to keeping the project shipping.
 
 ---
 
