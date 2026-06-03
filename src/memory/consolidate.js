@@ -1,5 +1,6 @@
 import { getMemoriesWithEmbeddings, listMemories, updateMemory, deleteMemory, createContradiction, contradictionExists } from './store.js';
 import { cosineSimilarity } from '../embed/index.js';
+import { SIMILARITY_THRESHOLDS } from './constants.js';
 import * as logger from '../utils/logger.js';
 
 /**
@@ -19,7 +20,7 @@ export async function consolidate(db, options = {}) {
     detectContradictions = true,
     applyDecay = true,
     cleanupStale = false,
-    duplicateThreshold = 0.92
+    duplicateThreshold = SIMILARITY_THRESHOLDS.MERGE
   } = options;
 
   logger.info('Starting memory consolidation', options);
@@ -79,7 +80,7 @@ export async function consolidate(db, options = {}) {
  * @param {number} threshold - Similarity threshold (default 0.92)
  * @returns {Promise<Array>} Array of duplicate pairs
  */
-async function findDuplicates(db, threshold = 0.92) {
+async function findDuplicates(db, threshold = SIMILARITY_THRESHOLDS.MERGE) {
   const memories = getMemoriesWithEmbeddings(db);
   const duplicates = [];
 

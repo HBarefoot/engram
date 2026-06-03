@@ -1,5 +1,6 @@
 import { getStats, getMemoriesWithEmbeddings } from './store.js';
 import { cosineSimilarity } from '../embed/index.js';
+import { SIMILARITY_THRESHOLDS } from './constants.js';
 import * as logger from '../utils/logger.js';
 
 /**
@@ -135,7 +136,7 @@ export function getNeverRecalled(db, limit = 50) {
  * @param {number} threshold - Similarity threshold (default 0.85)
  * @returns {Object} { clusters, totalDuplicates }
  */
-export function getDuplicateClusters(db, threshold = 0.85) {
+export function getDuplicateClusters(db, threshold = SIMILARITY_THRESHOLDS.REDUNDANT) {
   const memories = getMemoriesWithEmbeddings(db);
   const pairs = [];
 
