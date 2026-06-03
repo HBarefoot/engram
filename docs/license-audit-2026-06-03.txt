@@ -1,0 +1,23 @@
+├─ MIT: 307
+├─ Apache-2.0: 27
+├─ ISC: 27
+├─ BSD-3-Clause: 18
+├─ BSD-2-Clause: 7
+├─ BlueOak-1.0.0: 6
+├─ Python-2.0: 1
+├─ (MIT OR WTFPL): 1
+├─ Apache*: 1
+├─ (BSD-2-Clause OR MIT OR Apache-2.0): 1
+└─ 0BSD: 1
+
+
+--- Notable non-MIT packages ---
+
+argparse@2.0.1                          → Python-2.0      (Python License — BSD-style permissive)
+expand-template@2.0.3                   → (MIT OR WTFPL)  (MIT is fine; WTFPL is permissive)
+flatbuffers@1.12.0                      → Apache*         (Apache 2.0 with formatting glitch — permissive)
+rc@1.2.8                                → (BSD-2-Clause OR MIT OR Apache-2.0)  (triple permissive)
+tslib@2.8.1                             → 0BSD            (most permissive license that exists)
+
+All five are OSI-approved permissive licenses, fully compatible with MIT redistribution.
+Audit run: 2026-06-03 against the `chore/pre-launch-batch-1` branch.

@@ -15,6 +15,11 @@ npm install -g @hbarefoot/engram
 engram start
 ```
 
+<!-- TODO: insert hero GIF here once recorded —
+     <p align="center"><img src="docs/quickstart.gif" alt="Engram quickstart demo" width="900"></p>
+     See docs/quickstart.md for the recording instructions.
+-->
+
 Your AI agent now has long-term memory. Two minutes, no setup, no cloud.
 
 - 🧠 **In-process** — runs inside your agent's stack. No separate server to deploy, no IPC overhead, nothing to fork.

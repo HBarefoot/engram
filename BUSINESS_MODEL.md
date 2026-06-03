@@ -52,13 +52,34 @@ What that would *not* mean for users:
 
 ## License audit
 
-Engram's runtime dependencies are vetted to be acquirer-clean and OSS-redistributable:
+Engram's runtime dependencies are vetted to be acquirer-clean and OSS-redistributable. The most recent audit (2026-06-03) covered all 397 packages in the transitive dependency tree:
 
-- All runtime dependencies are under permissive licenses (MIT, ISC, Apache 2.0, BSD).
-- No GPL/AGPL/SSPL in the runtime path.
-- License inventory is verifiable via `npx license-checker --summary` from a fresh clone.
+| License | Count |
+|---|---|
+| MIT | 307 |
+| Apache-2.0 | 27 |
+| ISC | 27 |
+| BSD-3-Clause | 18 |
+| BSD-2-Clause | 7 |
+| BlueOak-1.0.0 | 6 |
+| Python-2.0 (`argparse`) | 1 |
+| `(MIT OR WTFPL)` (`expand-template`) | 1 |
+| Apache 2.0 reported as `Apache*` (`flatbuffers`) | 1 |
+| `(BSD-2-Clause OR MIT OR Apache-2.0)` (`rc`) | 1 |
+| 0BSD (`tslib`) | 1 |
 
-If you spot a dependency that violates this, please open an issue — it's a bug.
+**All permissive.** Zero packages under GPL, AGPL, LGPL, SSPL, EUPL, or any other copyleft / source-available license. Every dependency is freely redistributable as part of the Engram OSS package.
+
+Reproduce the audit at any commit:
+
+```bash
+npx license-checker --summary           # totals by license
+npx license-checker --json | jq 'keys'  # one entry per package
+```
+
+If you spot a dependency under a license not listed above, please open an issue — it's a bug.
+
+The full audit output from 2026-06-03 is archived at [`docs/license-audit-2026-06-03.txt`](docs/license-audit-2026-06-03.txt).
 
 ---
 
