@@ -796,27 +796,39 @@ export function listContradictions(db, options = {}) {
 }
 
 /**
- * Resolve a contradiction
+ * Resolve a contradiction.
+ *
+ * Note on return shape: for `keep_first` and `keep_second`, the side-effect
+ * delete of the chosen memory cascades through the `ON DELETE CASCADE` FKs
+ * to remove the contradiction row entirely. To keep the return value useful
+ * to callers (REST handler, dashboard), we snapshot the contradiction
+ * BEFORE any mutation and return the snapshot with the resolved-status
+ * fields overlaid — caller never sees a misleading null on success.
+ *
  * @param {Database} db
  * @param {string} id - Contradiction ID
  * @param {string} action - 'keep_first' | 'keep_second' | 'keep_both' | 'dismiss'
- * @returns {Object|null} Updated contradiction or null if not found
+ * @returns {Object|null} Resolved contradiction (with snapshot of deleted
+ *   memory for keep_first/keep_second), or null if the id doesn't exist
  */
 export function resolveContradiction(db, id, action) {
-  const contradiction = getContradiction(db, id);
-  if (!contradiction) return null;
+  const snapshot = getContradiction(db, id);
+  if (!snapshot) return null;
 
   const now = Date.now();
 
   // Perform side effects based on action
-  if (action === 'keep_first' && contradiction.memory2) {
-    deleteMemory(db, contradiction.memory2.id);
-  } else if (action === 'keep_second' && contradiction.memory1) {
-    deleteMemory(db, contradiction.memory1.id);
+  if (action === 'keep_first' && snapshot.memory2) {
+    deleteMemory(db, snapshot.memory2.id);
+  } else if (action === 'keep_second' && snapshot.memory1) {
+    deleteMemory(db, snapshot.memory1.id);
   }
 
   const newStatus = action === 'dismiss' ? 'dismissed' : 'resolved';
 
+  // Update the contradiction row. For keep_first/keep_second the ON DELETE
+  // CASCADE will already have removed it; UPDATE is a no-op in that case.
+  // For keep_both/dismiss the UPDATE succeeds and the row stays.
   const stmt = db.prepare(`
     UPDATE contradictions
     SET status = ?, resolved_at = ?, resolution_action = ?
@@ -826,7 +838,15 @@ export function resolveContradiction(db, id, action) {
 
   logger.info('Contradiction resolved', { id, action, status: newStatus });
 
-  return getContradiction(db, id);
+  // Return the snapshot with the resolved-state overlaid. This is correct
+  // for every action: keep_both/dismiss could also re-query, but using the
+  // snapshot here keeps the return path uniform and avoids a second DB hit.
+  return {
+    ...snapshot,
+    status: newStatus,
+    resolved_at: now,
+    resolution_action: action
+  };
 }
 
 /**

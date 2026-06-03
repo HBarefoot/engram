@@ -55,15 +55,16 @@ program
   .option('--mcp-only', 'Start only the MCP server (stdio mode)')
   .option('--port <port>', 'Custom port for REST API', '3838')
   .option('--config <path>', 'Path to config file')
+  .option('--data-dir <path>', 'Override data directory (also: ENGRAM_DATA_DIR env)')
   .action(async (options) => {
     if (options.mcpOnly) {
       // Start MCP server only (stdio mode) — no formatting imports
       logger.info('Starting Engram MCP server (stdio mode)...');
-      await startMCPServer(options.config);
+      await startMCPServer(options.config, { dataDir: options.dataDir });
     } else {
       const f = await loadFormat();
       const chalk = (await import('chalk')).default;
-      const config = loadConfig(options.config);
+      const config = loadConfig(options.config, { dataDir: options.dataDir });
       const requestedPort = parseInt(options.port);
 
       f.printHeader(version);
@@ -100,10 +101,11 @@ program
   .option('--confidence <score>', 'Confidence score (0-1)', parseFloat, 0.8)
   .option('-n, --namespace <name>', 'Project/scope namespace', 'default')
   .option('--config <path>', 'Path to config file')
+  .option('--data-dir <path>', 'Override data directory (also: ENGRAM_DATA_DIR env)')
   .action(async (content, options) => {
     const f = await loadFormat();
     try {
-      const config = loadConfig(options.config);
+      const config = loadConfig(options.config, { dataDir: options.dataDir });
       const db = initDatabase(getDatabasePath(config));
 
       // Validate content
@@ -176,11 +178,12 @@ program
   .option('-n, --namespace <name>', 'Filter by namespace')
   .option('--threshold <score>', 'Minimum relevance score (0-1)', parseFloat, 0.3)
   .option('--config <path>', 'Path to config file')
+  .option('--data-dir <path>', 'Override data directory (also: ENGRAM_DATA_DIR env)')
   .action(async (query, options) => {
     const f = await loadFormat();
     const chalk = (await import('chalk')).default;
     try {
-      const config = loadConfig(options.config);
+      const config = loadConfig(options.config, { dataDir: options.dataDir });
       const db = initDatabase(getDatabasePath(config));
       const modelsPath = getModelsPath(config);
 
@@ -241,11 +244,12 @@ program
   .command('forget <id>')
   .description('Delete a memory by ID')
   .option('--config <path>', 'Path to config file')
+  .option('--data-dir <path>', 'Override data directory (also: ENGRAM_DATA_DIR env)')
   .action(async (id, options) => {
     const f = await loadFormat();
     const chalk = (await import('chalk')).default;
     try {
-      const config = loadConfig(options.config);
+      const config = loadConfig(options.config, { dataDir: options.dataDir });
       const db = initDatabase(getDatabasePath(config));
 
       const memory = getMemory(db, id);
@@ -290,10 +294,11 @@ program
   .option('-c, --category <type>', 'Filter by category')
   .option('-n, --namespace <name>', 'Filter by namespace')
   .option('--config <path>', 'Path to config file')
+  .option('--data-dir <path>', 'Override data directory (also: ENGRAM_DATA_DIR env)')
   .action(async (options) => {
     const f = await loadFormat();
     try {
-      const config = loadConfig(options.config);
+      const config = loadConfig(options.config, { dataDir: options.dataDir });
       const db = initDatabase(getDatabasePath(config));
 
       const memories = listMemories(db, {
@@ -343,11 +348,12 @@ program
   .command('status')
   .description('Show Engram status and statistics')
   .option('--config <path>', 'Path to config file')
+  .option('--data-dir <path>', 'Override data directory (also: ENGRAM_DATA_DIR env)')
   .action(async (options) => {
     const f = await loadFormat();
     const chalk = (await import('chalk')).default;
     try {
-      const config = loadConfig(options.config);
+      const config = loadConfig(options.config, { dataDir: options.dataDir });
       const db = initDatabase(getDatabasePath(config));
       const stats = getStats(db);
 
@@ -437,10 +443,11 @@ program
   .option('--no-decay', 'Skip confidence decay')
   .option('--cleanup-stale', 'Enable stale memory cleanup')
   .option('--config <path>', 'Path to config file')
+  .option('--data-dir <path>', 'Override data directory (also: ENGRAM_DATA_DIR env)')
   .action(async (options) => {
     const f = await loadFormat();
     try {
-      const config = loadConfig(options.config);
+      const config = loadConfig(options.config, { dataDir: options.dataDir });
       const db = initDatabase(getDatabasePath(config));
 
       const spin = f.spinner('Running consolidation...');
@@ -479,11 +486,12 @@ program
   .command('conflicts')
   .description('Show detected contradictions')
   .option('--config <path>', 'Path to config file')
+  .option('--data-dir <path>', 'Override data directory (also: ENGRAM_DATA_DIR env)')
   .action(async (options) => {
     const f = await loadFormat();
     const chalk = (await import('chalk')).default;
     try {
-      const config = loadConfig(options.config);
+      const config = loadConfig(options.config, { dataDir: options.dataDir });
       const db = initDatabase(getDatabasePath(config));
 
       const conflicts = getConflicts(db);
@@ -530,11 +538,12 @@ program
   .option('--header <text>', 'Custom header text')
   .option('--footer <text>', 'Custom footer text')
   .option('--config <path>', 'Path to config file')
+  .option('--data-dir <path>', 'Override data directory (also: ENGRAM_DATA_DIR env)')
   .action(async (options) => {
     const f = await loadFormat();
     const chalk = (await import('chalk')).default;
     try {
-      const config = loadConfig(options.config);
+      const config = loadConfig(options.config, { dataDir: options.dataDir });
       const db = initDatabase(getDatabasePath(config));
 
       const categories = options.categories ? options.categories.split(',') : undefined;
@@ -592,6 +601,7 @@ program
   .option('--dry-run', 'Preview without committing')
   .option('-n, --namespace <name>', 'Override namespace for imported memories')
   .option('--config <path>', 'Path to config file')
+  .option('--data-dir <path>', 'Override data directory (also: ENGRAM_DATA_DIR env)')
   .option('-p, --paths <dirs>', 'Additional directories to scan (comma-separated)')
   .action(async (options) => {
     try {
@@ -602,6 +612,7 @@ program
         dryRun: options.dryRun,
         namespace: options.namespace,
         config: options.config,
+        dataDir: options.dataDir,
         paths
       });
     } catch (error) {

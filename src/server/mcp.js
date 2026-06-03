@@ -645,10 +645,13 @@ export class EngramMCPServer {
 
 /**
  * Start the MCP server
+ * @param {string} [configPath] - Optional path to config file
+ * @param {Object} [options]
+ * @param {string} [options.dataDir] - Override the data directory
  */
-export async function startMCPServer(configPath) {
+export async function startMCPServer(configPath, { dataDir } = {}) {
   try {
-    const config = loadConfig(configPath);
+    const config = loadConfig(configPath, { dataDir });
     const server = new EngramMCPServer(config);
 
     // Handle shutdown gracefully

@@ -75,11 +75,33 @@ function ensureDataDir(dataDir) {
 }
 
 /**
- * Load configuration from file or create default
+ * Resolve a path that may contain a leading ~ to an absolute path.
+ * @param {string} p
+ * @returns {string}
+ */
+function resolveDataDir(p) {
+  if (!p) return p;
+  const expanded = p.startsWith('~')
+    ? path.join(os.homedir(), p.slice(1))
+    : p;
+  return path.resolve(expanded);
+}
+
+/**
+ * Load configuration from file or create default.
+ *
+ * Override priority for `dataDir`:
+ *   1. `options.dataDir` (CLI --data-dir flag)
+ *   2. `process.env.ENGRAM_DATA_DIR`
+ *   3. `dataDir` from config.json
+ *   4. Default (~/.engram)
+ *
  * @param {string} [configPath] - Optional custom config path
+ * @param {Object} [options]
+ * @param {string} [options.dataDir] - Override the data directory (highest priority)
  * @returns {Object} Configuration object
  */
-export function loadConfig(configPath) {
+export function loadConfig(configPath, { dataDir } = {}) {
   const config = { ...DEFAULT_CONFIG };
 
   // Determine config file path
@@ -88,32 +110,41 @@ export function loadConfig(configPath) {
   // Ensure data directory exists
   ensureDataDir(config.dataDir);
 
+  let merged = config;
+
   // Load config from file if it exists
   if (fs.existsSync(actualConfigPath)) {
     try {
       const fileConfig = JSON.parse(fs.readFileSync(actualConfigPath, 'utf-8'));
-      const merged = deepMerge(config, fileConfig);
+      merged = deepMerge(config, fileConfig);
 
       // Ensure data directory from loaded config exists
       if (merged.dataDir !== config.dataDir) {
         ensureDataDir(merged.dataDir);
       }
-
-      return merged;
     } catch (error) {
       console.warn(`Failed to load config from ${actualConfigPath}:`, error.message);
       console.warn('Using default configuration');
+      merged = config;
+    }
+  } else {
+    // Save default config to file if it doesn't exist
+    try {
+      fs.writeFileSync(actualConfigPath, JSON.stringify(config, null, 2), 'utf-8');
+    } catch (error) {
+      console.warn(`Failed to save default config to ${actualConfigPath}:`, error.message);
     }
   }
 
-  // Save default config to file if it doesn't exist
-  try {
-    fs.writeFileSync(actualConfigPath, JSON.stringify(config, null, 2), 'utf-8');
-  } catch (error) {
-    console.warn(`Failed to save default config to ${actualConfigPath}:`, error.message);
+  // Apply dataDir override (CLI flag > env var > file value)
+  const override = dataDir || process.env.ENGRAM_DATA_DIR;
+  if (override) {
+    const resolved = resolveDataDir(override);
+    merged = { ...merged, dataDir: resolved };
+    ensureDataDir(resolved);
   }
 
-  return config;
+  return merged;
 }
 
 /**
