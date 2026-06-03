@@ -127,7 +127,7 @@ describe('Contradictions', () => {
   });
 
   describe('resolveContradiction', () => {
-    it('keep_first should delete memory2 and return a resolved snapshot', () => {
+    it('keep_first should delete memory2, mark resolved, and survive in the DB', () => {
       const c = createContradiction(db, {
         memory1_id: m1.id,
         memory2_id: m2.id,
@@ -135,25 +135,27 @@ describe('Contradictions', () => {
       });
 
       const r = resolveContradiction(db, c.id, 'keep_first');
-      // Even though ON DELETE CASCADE removes the contradiction row when
-      // memory2 is deleted, the function returns a snapshot built at the
-      // start of the call with the resolved-state overlaid.
+      // Function returns a snapshot with resolved-state overlaid
       expect(r).not.toBeNull();
       expect(r.id).toBe(c.id);
       expect(r.status).toBe('resolved');
       expect(r.resolution_action).toBe('keep_first');
       expect(r.resolved_at).toBeGreaterThan(0);
-      // Snapshot preserves both memory references at the time of resolution
-      expect(r.memory1).toBeDefined();
       expect(r.memory1.id).toBe(m1.id);
-      expect(r.memory2).toBeDefined();
       expect(r.memory2.id).toBe(m2.id);
       // Side effects: memory1 still present, memory2 deleted
       expect(getMemory(db, m1.id)).not.toBeNull();
       expect(getMemory(db, m2.id)).toBeNull();
+      // FK SET NULL: contradiction row SURVIVES with memory2_id nulled out
+      const persisted = getContradiction(db, c.id);
+      expect(persisted).not.toBeNull();
+      expect(persisted.status).toBe('resolved');
+      expect(persisted.resolution_action).toBe('keep_first');
+      expect(persisted.memory1).not.toBeNull();
+      expect(persisted.memory2).toBeNull();
     });
 
-    it('keep_second should delete memory1 and return a resolved snapshot', () => {
+    it('keep_second should delete memory1, mark resolved, and survive in the DB', () => {
       const c = createContradiction(db, {
         memory1_id: m1.id,
         memory2_id: m2.id,
@@ -162,12 +164,32 @@ describe('Contradictions', () => {
 
       const r = resolveContradiction(db, c.id, 'keep_second');
       expect(r).not.toBeNull();
-      expect(r.id).toBe(c.id);
       expect(r.status).toBe('resolved');
       expect(r.resolution_action).toBe('keep_second');
-      expect(r.resolved_at).toBeGreaterThan(0);
       expect(getMemory(db, m1.id)).toBeNull();
       expect(getMemory(db, m2.id)).not.toBeNull();
+      // Survives with memory1_id nulled out
+      const persisted = getContradiction(db, c.id);
+      expect(persisted).not.toBeNull();
+      expect(persisted.status).toBe('resolved');
+      expect(persisted.memory1).toBeNull();
+      expect(persisted.memory2).not.toBeNull();
+    });
+
+    it('resolved contradictions appear in listContradictions(status="resolved")', () => {
+      const c = createContradiction(db, {
+        memory1_id: m1.id,
+        memory2_id: m2.id,
+        confidence: 0.9
+      });
+      resolveContradiction(db, c.id, 'keep_first');
+
+      const resolved = listContradictions(db, { status: 'resolved' });
+      expect(resolved.total).toBe(1);
+      expect(resolved.items[0].id).toBe(c.id);
+      expect(resolved.items[0].memory2).toBeNull(); // deleted memory's row is null
+      const unresolved = listContradictions(db, { status: 'unresolved' });
+      expect(unresolved.total).toBe(0);
     });
 
     it('keep_both should leave both memories intact, marked resolved', () => {
