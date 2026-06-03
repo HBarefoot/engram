@@ -8,13 +8,17 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [1.5.3] - 2026-06-03
 
-### Changed
-
-- Centralized similarity thresholds. `src/memory/constants.js` now exports `SIMILARITY_THRESHOLDS = { REDUNDANT: 0.85, MERGE: 0.92, DUPLICATE: 0.95 }`; `store.js`, `analytics.js`, and `consolidate.js` import from it. The threshold-mismatch class of bugs (e.g. the "Merge N duplicates" no-op fixed in v1.5.2) is now structurally prevented — module-local hardcoded thresholds are gone.
+This release bundles three independent improvements (PRs #23, #24, #25). Each was reviewed separately; bundling the version bump keeps the npm release history tidier.
 
 ### Added
 
-- This `CHANGELOG.md`. Entries for v1.4.x and v1.5.x backfilled from git history; future releases land entries with their PRs.
+- **Onboarding wizard on the web dashboard.** First-time visitors (empty database + no `engram.onboarding.completed` localStorage flag) now land on a 4-step wizard — Welcome → Connect your AI agent → Seed a memory → Done — instead of a blank dashboard. Closes the highest-priority gap from `docs/feature-parity.md`. The wizard is lazy-loaded (~8.6 kB chunk); main bundle is unchanged. [#25](https://github.com/HBarefoot/engram/pull/25)
+- This `CHANGELOG.md`. Entries for v1.4.x and v1.5.x backfilled from git history; future releases land entries with their PRs. [#23](https://github.com/HBarefoot/engram/pull/23)
+
+### Changed
+
+- **Contradictions FK switched from `ON DELETE CASCADE` to `ON DELETE SET NULL`.** Resolved contradictions now survive in the database after `keep_first` / `keep_second` deletes the not-kept memory — `listContradictions({ status: 'resolved' })` returns real history instead of always-zero. The migration is idempotent (gated by a `contradictions_fk_set_null_v1` meta flag) and uses the standard SQLite table-rebuild dance in a single transaction. [#24](https://github.com/HBarefoot/engram/pull/24)
+- **Centralized similarity thresholds.** `src/memory/constants.js` now exports `SIMILARITY_THRESHOLDS = { REDUNDANT: 0.85, MERGE: 0.92, DUPLICATE: 0.95 }`; `store.js`, `analytics.js`, and `consolidate.js` import from it. The threshold-mismatch class of bugs (e.g. the "Merge N duplicates" no-op fixed in v1.5.2) is now structurally prevented — module-local hardcoded thresholds are gone. [#23](https://github.com/HBarefoot/engram/pull/23)
 
 ## [1.5.2] - 2026-06-03
 
