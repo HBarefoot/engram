@@ -95,7 +95,13 @@ export default function MemoryHealth() {
     if (!confirm('Run consolidation to merge duplicate memories?')) return;
     setCleaning(true);
     try {
-      const result = await api.consolidate({ detectDuplicates: true });
+      // Use the same threshold the analytics duplicate-cluster query
+       // uses (0.85), otherwise the merge runs at consolidate.js's stricter
+       // default of 0.92 and reports 0 removed for clusters in the 0.85–0.92 band.
+      const result = await api.consolidate({
+        detectDuplicates: true,
+        duplicateThreshold: 0.85
+      });
       setCleanResult(`Removed ${result.results?.duplicatesRemoved || 0} duplicates`);
       loadData();
     } catch (err) {
