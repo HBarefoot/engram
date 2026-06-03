@@ -22,7 +22,7 @@ Investigation summary (full details in plan file):
 - 🟡 **P1 — Version drift fix.** Staged: ✅ `package.json` bumped 1.4.2 → 1.4.6, ✅ `CONTRIBUTING.md` versioning policy added ("npm + desktop together, dashboard decoupled"). ⬜ Pending: publish `@hbarefoot/engram@1.4.6` to npm (needs 2FA from owner).
 - ✅ **P2 — Ghost reference grep.** Fixed: `src/server/mcp.js:19` (4→6 tools), `docs/ARCHITECTURE.md:314` (4→6 tools), `docs/api.md:242` (recall formula updated to `0.45/0.15/0.15/0.05 + 0.10 feedback + fts_boost`). `CLAUDE.md` was already synced earlier. README.md / examples/ checked — no stale references found. Notion pages still need pruning (out-of-repo task).
 - ✅ **P3 — Minimum MCP server tests.** Added: `test/server/mcp.test.js` (18 tests across all 6 MCP tools), `test/memory/feedback.test.js` (20), `test/memory/context.test.js` (16), `test/memory/contradiction.test.js` (16). Pattern: tmpdir-per-test, model cache seeded from `node_modules/@xenova/transformers/.cache`. Test count: 139 → 209.
-- ⬜ **P4 — Cold install dry-run.** Fresh tmpdir → `npm i -g @hbarefoot/engram` → `engram start` → Claude Code connect → all 6 MCP tools round-trip. Document rough edges in this file.
+- ✅ **P4 — Cold install dry-run.** Executed 2026-06-03 in two passes. See "Cold-install dry-run notes" section below. Net result: install + boot + dashboard + HTTP endpoints all work cleanly. Surfaced and fixed one launch blocker (root `npm install` did not auto-install dashboard deps, so `prepublishOnly` failed on fresh checkouts) and two non-blocking observations (ignored `ENGRAM_DATA_DIR`, 615 kB JS bundle).
 
 **Test/lint baseline (2026-06-02 after P1–P3):** 209/209 tests pass, 0 lint errors, 19 pre-existing warnings.
 
@@ -58,9 +58,28 @@ Investigation summary (full details in plan file):
 | Glama | not started | | |
 | mcp.so | not started | | |
 
-## Cold-install dry-run notes
+## Cold-install dry-run notes (2026-06-03)
 
-_To be filled during P4. Document anything that surprises a first-time installer._
+Two passes from a fresh `mktemp` directory.
+
+### Pass A — `npm install @hbarefoot/engram@1.4.2` (what npm serves today)
+
+- ✅ Install in 18s. No errors. `node_modules/.bin/engram` symlinked correctly.
+- ✅ `engram --version` → `1.4.2`. `engram --help` shows 10 real commands; no ghost commands (`agents`, `connect`, `audit`, `purge`, `seed`, `review`) — the spec's phantom commands were never in the actual CLI binary.
+- ✅ `engram start --port <free>` boots in <0.5s. Model loads from cache in ~2s.
+- ✅ `GET /health` and `GET /api/status` return well-formed JSON with version, uptime, memory counts, model status.
+- 🟡 **Observation — `ENGRAM_DATA_DIR` env var is ignored.** Setting `ENGRAM_DATA_DIR=/tmp/foo` before `engram start` did NOT redirect data to that path; engram continued to use `~/.engram/memory.db`. There's no env-var or CLI flag to override `dataDir` at startup; you must write a custom `config.json` and pass `--config`. This is a usability gap for evaluators sandboxing the package. Not launch-blocking but worth a quick `--data-dir <path>` flag in a future patch.
+
+### Pass B — local `npm pack` (what would publish as v1.4.6)
+
+- 🔴 **BLOCKER (now fixed in `fix/build-auto-install-dashboard-deps`).** Root `npm install` does NOT auto-install the dashboard subdirectory's dependencies. `npm run build` (and therefore `prepublishOnly`) fails on a fresh checkout with `ERR_MODULE_NOT_FOUND: Cannot find package '@vitejs/plugin-react'`. CI works around this by explicitly running `npm ci` in `dashboard/` before building. Local publish would fail on a fresh clone. Fix: changed the `build` script to `cd dashboard && (test -d node_modules || npm install --no-audit --no-fund) && npm run build`. Verified: clean build 2.6s, cached build 1.25s.
+- ✅ After the fix: `npm pack` succeeds, produces `hbarefoot-engram-1.4.6.tgz` with 39 files including the freshly-built `dashboard/dist/`.
+- ✅ Tarball installs into a fresh tmpdir, `engram --version` returns `1.4.6`, boots cleanly on a custom port, `/health` and `/api/status` return v1.4.6, dashboard HTML serves at `/`.
+- 🟡 **Observation — JS bundle is 615 kB (176 kB gzipped).** Vite warns: "chunks larger than 500 kB after minification." Code-splitting via dynamic `import()` would help, but not launch-blocking.
+
+### Net launch posture
+
+Once the dashboard-deps build fix lands, the cold-install path is clean. New users can `npm install -g @hbarefoot/engram@1.4.6`, run `engram start`, get a working dashboard + REST + MCP server on first try.
 
 ## Competitive intel
 
