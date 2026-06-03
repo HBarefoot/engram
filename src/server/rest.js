@@ -237,6 +237,7 @@ export function createRESTServer(config) {
           confidence: memory.confidence,
           namespace: memory.namespace,
           tags: memory.tags,
+          source: memory.source,
           createdAt: memory.created_at
         },
         warnings: validation.warnings
@@ -277,6 +278,7 @@ export function createRESTServer(config) {
           confidence: m.confidence,
           namespace: m.namespace,
           tags: m.tags,
+          source: m.source,
           accessCount: m.access_count,
           createdAt: m.created_at,
           lastAccessed: m.last_accessed
@@ -322,6 +324,7 @@ export function createRESTServer(config) {
           confidence: m.confidence,
           namespace: m.namespace,
           tags: m.tags,
+          source: m.source,
           score: m.score,
           scoreBreakdown: m.scoreBreakdown,
           accessCount: m.access_count,
@@ -357,6 +360,7 @@ export function createRESTServer(config) {
           confidence: memory.confidence,
           namespace: memory.namespace,
           tags: memory.tags,
+          source: memory.source,
           accessCount: memory.access_count,
           decayRate: memory.decay_rate,
           createdAt: memory.created_at,
