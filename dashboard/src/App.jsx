@@ -1,5 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { api } from './utils/api';
+import { isOnboardingCompleted } from './utils/onboarding';
 
 // Code-split each page so the initial bundle stays small.
 // React.lazy() loads each page chunk on first navigation.
@@ -12,16 +13,46 @@ const Download = lazy(() => import('./pages/Download'));
 const ImportWizard = lazy(() => import('./pages/ImportWizard'));
 const MemoryHealth = lazy(() => import('./pages/MemoryHealth'));
 const Contradictions = lazy(() => import('./pages/Contradictions'));
+const Onboarding = lazy(() => import('./pages/Onboarding'));
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const [contradictionCount, setContradictionCount] = useState(0);
+  // `null` = still deciding; true/false = decided.
+  const [showOnboarding, setShowOnboarding] = useState(null);
+
+  useEffect(() => {
+    // Onboarding decision runs once on first mount.
+    if (isOnboardingCompleted()) {
+      setShowOnboarding(false);
+      return;
+    }
+    // Fresh install heuristic: dashboard shows onboarding when the user
+    // has zero memories AND hasn't ticked the completed flag.
+    api.getStatus()
+      .then(data => setShowOnboarding((data?.memory?.total ?? 0) === 0))
+      .catch(() => setShowOnboarding(false));
+  }, []);
 
   useEffect(() => {
     api.getContradictionCount()
       .then(data => setContradictionCount(data.count || 0))
       .catch(() => {});
   }, [currentPage]);
+
+  // Wait until the onboarding decision is made — prevents the dashboard
+  // chrome flashing in for one render before redirecting to the wizard.
+  if (showOnboarding === null) {
+    return <div className="min-h-screen bg-gray-50 dark:bg-gray-900" />;
+  }
+
+  if (showOnboarding) {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-gray-900" />}>
+        <Onboarding onComplete={() => setShowOnboarding(false)} />
+      </Suspense>
+    );
+  }
 
   const pages = {
     dashboard: <Dashboard />,
