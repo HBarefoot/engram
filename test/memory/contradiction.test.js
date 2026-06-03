@@ -127,7 +127,7 @@ describe('Contradictions', () => {
   });
 
   describe('resolveContradiction', () => {
-    it('keep_first should delete memory2 (return value cascades to null)', () => {
+    it('keep_first should delete memory2 and return a resolved snapshot', () => {
       const c = createContradiction(db, {
         memory1_id: m1.id,
         memory2_id: m2.id,
@@ -135,16 +135,25 @@ describe('Contradictions', () => {
       });
 
       const r = resolveContradiction(db, c.id, 'keep_first');
-      // Note: contradictions table has ON DELETE CASCADE on both memory FKs.
-      // After memory2 is deleted, the contradiction row is cascaded away,
-      // so resolveContradiction's final getContradiction returns null.
-      // The side-effect delete still happens correctly.
-      expect(r).toBeNull();
+      // Even though ON DELETE CASCADE removes the contradiction row when
+      // memory2 is deleted, the function returns a snapshot built at the
+      // start of the call with the resolved-state overlaid.
+      expect(r).not.toBeNull();
+      expect(r.id).toBe(c.id);
+      expect(r.status).toBe('resolved');
+      expect(r.resolution_action).toBe('keep_first');
+      expect(r.resolved_at).toBeGreaterThan(0);
+      // Snapshot preserves both memory references at the time of resolution
+      expect(r.memory1).toBeDefined();
+      expect(r.memory1.id).toBe(m1.id);
+      expect(r.memory2).toBeDefined();
+      expect(r.memory2.id).toBe(m2.id);
+      // Side effects: memory1 still present, memory2 deleted
       expect(getMemory(db, m1.id)).not.toBeNull();
       expect(getMemory(db, m2.id)).toBeNull();
     });
 
-    it('keep_second should delete memory1 (return value cascades to null)', () => {
+    it('keep_second should delete memory1 and return a resolved snapshot', () => {
       const c = createContradiction(db, {
         memory1_id: m1.id,
         memory2_id: m2.id,
@@ -152,8 +161,11 @@ describe('Contradictions', () => {
       });
 
       const r = resolveContradiction(db, c.id, 'keep_second');
-      // Same cascade behavior as keep_first.
-      expect(r).toBeNull();
+      expect(r).not.toBeNull();
+      expect(r.id).toBe(c.id);
+      expect(r.status).toBe('resolved');
+      expect(r.resolution_action).toBe('keep_second');
+      expect(r.resolved_at).toBeGreaterThan(0);
       expect(getMemory(db, m1.id)).toBeNull();
       expect(getMemory(db, m2.id)).not.toBeNull();
     });
