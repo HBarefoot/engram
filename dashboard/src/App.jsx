@@ -1,14 +1,17 @@
-import { useState, useEffect } from 'react';
-import Dashboard from './pages/Dashboard';
-import MemoryList from './pages/MemoryList';
-import SearchMemories from './pages/SearchMemories';
-import Statistics from './pages/Statistics';
-import Agents from './pages/Agents';
-import Download from './pages/Download';
-import ImportWizard from './pages/ImportWizard';
-import MemoryHealth from './pages/MemoryHealth';
-import Contradictions from './pages/Contradictions';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { api } from './utils/api';
+
+// Code-split each page so the initial bundle stays small.
+// React.lazy() loads each page chunk on first navigation.
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const MemoryList = lazy(() => import('./pages/MemoryList'));
+const SearchMemories = lazy(() => import('./pages/SearchMemories'));
+const Statistics = lazy(() => import('./pages/Statistics'));
+const Agents = lazy(() => import('./pages/Agents'));
+const Download = lazy(() => import('./pages/Download'));
+const ImportWizard = lazy(() => import('./pages/ImportWizard'));
+const MemoryHealth = lazy(() => import('./pages/MemoryHealth'));
+const Contradictions = lazy(() => import('./pages/Contradictions'));
 
 function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -150,7 +153,15 @@ function App() {
       {/* Main Content */}
       <main>
         <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          {pages[currentPage]}
+          <Suspense
+            fallback={
+              <div className="text-center text-gray-500 dark:text-gray-400 py-12">
+                Loading…
+              </div>
+            }
+          >
+            {pages[currentPage]}
+          </Suspense>
         </div>
       </main>
     </div>
