@@ -272,6 +272,25 @@ An `llm.*` block is reserved for opt-in Layer 1 LLM enhancement (Ollama, LM Stud
 
 ## Advanced usage
 
+### Sandboxed evaluation
+
+Redirect Engram's data directory to a throwaway location so it doesn't touch `~/.engram/memory.db`. Useful for first-time evaluators, CI runs, or testing the desktop sidecar against a fresh DB:
+
+```bash
+# Via CLI flag (highest priority)
+engram start --data-dir /tmp/engram-eval
+
+# Or via env var
+ENGRAM_DATA_DIR=/tmp/engram-eval engram start
+
+# Works on every Engram command that touches the DB:
+ENGRAM_DATA_DIR=/tmp/engram-eval engram remember "test memory" -c fact
+ENGRAM_DATA_DIR=/tmp/engram-eval engram recall "test"
+ENGRAM_DATA_DIR=/tmp/engram-eval engram status
+```
+
+Override priority: `--data-dir` flag > `ENGRAM_DATA_DIR` env var > `dataDir` in `~/.engram/config.json` > default (`~/.engram`).
+
 ### Namespace isolation
 
 ```bash

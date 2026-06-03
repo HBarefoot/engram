@@ -17,10 +17,11 @@ import chalk from 'chalk';
  * @param {boolean} [options.dryRun] - Preview without committing
  * @param {string} [options.namespace] - Override namespace
  * @param {string} [options.config] - Config file path
+ * @param {string} [options.dataDir] - Override data directory
  * @param {string[]} [options.paths] - Additional directories to scan
  */
 export async function runWizard(options = {}) {
-  const config = loadConfig(options.config);
+  const config = loadConfig(options.config, { dataDir: options.dataDir });
 
   // Non-interactive single-source mode
   if (options.source) {
