@@ -45,6 +45,8 @@ Feature requests are welcome! Please:
 6. **Commit with clear messages** following our commit conventions
 7. **Submit a pull request** with a clear description
 
+**Contributor License Agreement.** First-time external contributors will be prompted by the CLA Assistant bot to sign Engram's CLA on their PR — see [`CLA.md`](CLA.md) for the agreement text and signing instructions. It's a one-time step per GitHub account (subsequent PRs from the same account skip the prompt). The maintainer and bots like Dependabot are exempt.
+
 ## Development Setup
 
 ```bash
