@@ -130,12 +130,21 @@ function runMigrations(db) {
     );
   `);
 
-  // Contradictions table for detected memory conflicts
+  // Contradictions table for detected memory conflicts.
+  //
+  // FK behavior: ON DELETE SET NULL — when a memory referenced by a
+  // resolved contradiction is later deleted, the contradiction row
+  // survives with its memory{1,2}_id set to NULL. This lets the
+  // dashboard's Conflicts tab show resolved history without losing
+  // rows the moment keep_first/keep_second deletes the chosen memory.
+  // The keep_first/keep_second resolve actions intentionally trigger
+  // this behavior: the chosen-not-to-keep memory is deleted, its FK
+  // ref nulled out, the contradiction row stays as audit history.
   db.exec(`
     CREATE TABLE IF NOT EXISTS contradictions (
       id TEXT PRIMARY KEY,
-      memory1_id TEXT NOT NULL,
-      memory2_id TEXT NOT NULL,
+      memory1_id TEXT,
+      memory2_id TEXT,
       confidence REAL NOT NULL DEFAULT 0.5,
       reason TEXT,
       category TEXT,
@@ -144,8 +153,8 @@ function runMigrations(db) {
       detected_at INTEGER NOT NULL,
       resolved_at INTEGER,
       resolution_action TEXT,
-      FOREIGN KEY (memory1_id) REFERENCES memories(id) ON DELETE CASCADE,
-      FOREIGN KEY (memory2_id) REFERENCES memories(id) ON DELETE CASCADE
+      FOREIGN KEY (memory1_id) REFERENCES memories(id) ON DELETE SET NULL,
+      FOREIGN KEY (memory2_id) REFERENCES memories(id) ON DELETE SET NULL
     );
   `);
 
@@ -155,6 +164,56 @@ function runMigrations(db) {
     CREATE INDEX IF NOT EXISTS idx_contradictions_memory2 ON contradictions(memory2_id);
     CREATE INDEX IF NOT EXISTS idx_contradictions_detected_at ON contradictions(detected_at);
   `);
+
+  // Migration: rebuild existing contradictions tables that have ON DELETE
+  // CASCADE (from versions <= 1.5.2). Idempotent via the meta flag.
+  // The CREATE TABLE IF NOT EXISTS above is a no-op for existing tables,
+  // so old schemas need an explicit migration. SQLite doesn't support
+  // altering FK constraints in place — table rebuild dance is required.
+  const fkMigrationFlag = db.prepare('SELECT value FROM meta WHERE key = ?')
+    .get('contradictions_fk_set_null_v1');
+
+  if (!fkMigrationFlag) {
+    const fkInfo = db.prepare('PRAGMA foreign_key_list(contradictions)').all();
+    const hasCascade = fkInfo.some(fk => fk.on_delete === 'CASCADE');
+
+    if (hasCascade) {
+      logger.info('Migrating contradictions FKs to ON DELETE SET NULL');
+      const migrate = db.transaction(() => {
+        db.exec(`
+          CREATE TABLE contradictions_new (
+            id TEXT PRIMARY KEY,
+            memory1_id TEXT,
+            memory2_id TEXT,
+            confidence REAL NOT NULL DEFAULT 0.5,
+            reason TEXT,
+            category TEXT,
+            entity TEXT,
+            status TEXT NOT NULL DEFAULT 'unresolved',
+            detected_at INTEGER NOT NULL,
+            resolved_at INTEGER,
+            resolution_action TEXT,
+            FOREIGN KEY (memory1_id) REFERENCES memories(id) ON DELETE SET NULL,
+            FOREIGN KEY (memory2_id) REFERENCES memories(id) ON DELETE SET NULL
+          );
+          INSERT INTO contradictions_new SELECT * FROM contradictions;
+          DROP TABLE contradictions;
+          ALTER TABLE contradictions_new RENAME TO contradictions;
+          CREATE INDEX idx_contradictions_status ON contradictions(status);
+          CREATE INDEX idx_contradictions_memory1 ON contradictions(memory1_id);
+          CREATE INDEX idx_contradictions_memory2 ON contradictions(memory2_id);
+          CREATE INDEX idx_contradictions_detected_at ON contradictions(detected_at);
+        `);
+      });
+      migrate();
+      logger.info('Contradictions FK migration complete');
+    }
+
+    db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run(
+      'contradictions_fk_set_null_v1',
+      new Date().toISOString()
+    );
+  }
 
   logger.debug('Database migrations completed');
 }
