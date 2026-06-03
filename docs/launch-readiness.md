@@ -47,7 +47,7 @@ Investigation summary (full details in plan file):
 
 - ✅ **1.1 — README rewrite** (2026-06-02). New headline ("Persistent memory for AI agents. In-process. No infra."), three-bullet wedge, "Memory that improves over time" section promoted to first screen, comparison table expanded to include Letta + OpenMemory with sourced rows, all ghost CLI commands removed (`engram agents` / `connect` / `export` plain), REST endpoint table now matches actual surface (added contradictions / analytics / import endpoints), config schema corrected to match `~/.engram/config.json` defaults, programmatic-usage example added.
 - ⬜ **1.3 — Directory listings** (Days 8–10). modelcontextprotocol/servers, awesome-mcp-servers, mcpservers.org, Smithery, Glama, mcp.so.
-- ⬜ **1.4 — Quickstart GIF** (Days 10–13). asciinema/vhs → GIF for README.
+- ✅ **1.4 — Quickstart GIF** (2026-06-03). VHS tape at `docs/quickstart.tape`, recorded to `docs/quickstart.gif`, embedded under the README install block. Landing page badge also added; `package.json` `homepage` points at the landing page so the npm registry page links straight to it.
 - ⬜ **1.5 — Comparison table** folded into 1.1.
 
 ## Directory submission tracker

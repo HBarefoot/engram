@@ -1,6 +1,6 @@
 {
   "name": "@hbarefoot/engram",
-  "version": "1.4.6",
+  "version": "1.4.7",
   "description": "Persistent memory for AI agents. SQLite for agent state.",
   "type": "module",
   "main": "src/index.js",
@@ -52,12 +52,12 @@
   "author": "Engram Contributors",
   "repository": {
     "type": "git",
-    "url": "https://github.com/HBarefoot/engram.git"
+    "url": "git+https://github.com/HBarefoot/engram.git"
   },
   "bugs": {
     "url": "https://github.com/HBarefoot/engram/issues"
   },
-  "homepage": "https://github.com/HBarefoot/engram#readme",
+  "homepage": "https://next.henrybarefoot.com/engram",
   "engines": {
     "node": ">=20.0.0"
   },

@@ -6,6 +6,7 @@
 
 [![CI](https://github.com/HBarefoot/engram/actions/workflows/ci.yml/badge.svg)](https://github.com/HBarefoot/engram/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/@hbarefoot/engram)](https://www.npmjs.com/package/@hbarefoot/engram)
+[![Website](https://img.shields.io/badge/website-engram-blue)](https://next.henrybarefoot.com/engram)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 [![MCP](https://img.shields.io/badge/MCP-compatible-blue)](https://modelcontextprotocol.io)
@@ -15,10 +16,7 @@ npm install -g @hbarefoot/engram
 engram start
 ```
 
-<!-- TODO: insert hero GIF here once recorded —
-     <p align="center"><img src="docs/quickstart.gif" alt="Engram quickstart demo" width="900"></p>
-     See docs/quickstart.md for the recording instructions.
--->
+<p align="center"><img src="docs/quickstart.gif" alt="Engram quickstart demo" width="900"></p>
 
 Your AI agent now has long-term memory. Two minutes, no setup, no cloud.
 
