@@ -30,9 +30,12 @@ Investigation summary (full details in plan file):
 
 - **`resolveContradiction` returns `null` for `keep_first` / `keep_second`** (`src/memory/store.js:805`). The `contradictions` table has `ON DELETE CASCADE` on both memory FKs, so when the resolve action deletes one of the memories, the contradiction row is also cascaded away. The function's final `getContradiction(db, id)` then returns null even though the side effect succeeded. The REST endpoint at `POST /api/contradictions/:id/resolve` (`src/server/rest.js:509`) should be reviewed to confirm it handles the null return correctly — otherwise the caller sees a misleading 404-like response on a successful resolve. Not a hard bug but worth a follow-up. Tests document the current behavior.
 
-## Business model decision (Days 4–5)
+## Business model decision — RESOLVED (2026-06-03)
 
-- ⬜ Pick: pure OSS / open-core / dual-license. Document in `BUSINESS_MODEL.md`.
+- ✅ Chosen: **pure OSS (MIT)**, optimized for adoption-and-acquisition. No paywalls, no open-core fragmentation, no usage caps. Published in `BUSINESS_MODEL.md` (public-facing — does NOT mention acquisition pursuit; that strategy stays in the internal plan file).
+- ✅ `.github/FUNDING.yml` activated with `github: HBarefoot`. Sponsor button appears once GitHub Sponsors enrollment is approved.
+- ✅ README closing CTA refreshed with the ⭐/🐛/💬/❤️ flow and a link to `BUSINESS_MODEL.md`.
+- Internal strategy (timeline targets, acquirer pool, visibility playbook) lives in the plan file at `~/.claude/plans/i-want-you-investigate-wild-kitten.md` — not in the public repo.
 
 ## Analytics groundwork (Days 5–7)
 
