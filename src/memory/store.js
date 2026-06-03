@@ -1,12 +1,10 @@
 import Database from 'better-sqlite3';
 import { generateId } from '../utils/id.js';
 import * as logger from '../utils/logger.js';
+import { SIMILARITY_THRESHOLDS } from './constants.js';
 
-/**
- * Deduplication thresholds
- */
-const DUPLICATE_THRESHOLD = 0.95; // Nearly identical - reject
-const MERGE_THRESHOLD = 0.92;     // Similar but adds info - merge
+const DUPLICATE_THRESHOLD = SIMILARITY_THRESHOLDS.DUPLICATE; // Nearly identical - reject
+const MERGE_THRESHOLD = SIMILARITY_THRESHOLDS.MERGE;         // Similar but adds info - merge
 
 /**
  * Initialize the database and run migrations
