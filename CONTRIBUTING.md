@@ -246,9 +246,19 @@ Release checklist for any version bump:
 1. Update `package.json` and `desktop/package.json` to the same version.
 2. Run `npm test` and `npm run lint` from the repo root.
 3. Build the dashboard (`npm run build`) and confirm it's included in the npm tarball (`npm publish --dry-run`).
-4. Commit, tag, push.
-5. Cut a GitHub Release — the `publish.yml` workflow auto-publishes to npm.
-6. Trigger the desktop build pipeline if user-visible changes ship to the Tauri app.
+4. Update `CHANGELOG.md` with a new section for the version.
+5. Commit, tag, push.
+6. **Choose ONE publish path; do not double up:**
+   - **(a) GitHub Release (recommended)** — Create a release on github.com. The `.github/workflows/publish.yml` workflow fires on the `release: published` event, runs CI, then publishes to npm with provenance. Hands-off.
+   - **(b) Manual `npm publish`** — Run from a clean main checkout. Works the same but skips the visible Release artifact on GitHub.
+   - If you do both, the second one races and fails with `You cannot publish over the previously published versions`. Happened on v1.5.3; expected and harmless, but worth knowing.
+7. **Rebuild + redistribute the desktop app** if user-visible changes ship to the Tauri side. From the repo root:
+   ```bash
+   npm run desktop:build
+   # produces desktop/src-tauri/target/release/bundle/{macos,dmg}/
+   # → upload .dmg (or zipped .app) as a GitHub Release asset
+   ```
+   The desktop installer is updated independently of npm; users with the .app need to download the new build to get post-bump fixes.
 
 ## Pull Request Process
 
