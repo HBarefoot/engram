@@ -9,7 +9,7 @@ export default function HealthGauge({ score }: HealthGaugeProps) {
   const circumference = 2 * Math.PI * radius;
   const progress = (score / 100) * circumference;
 
-  const color = score >= 80 ? "#22c55e" : score >= 50 ? "#eab308" : "#ef4444";
+  const color = score >= 80 ? "#34d399" : score >= 50 ? "#fbbf24" : "#fb7185";
   const label = score >= 80 ? "Healthy" : score >= 50 ? "Needs Attention" : "Unhealthy";
 
   return (
@@ -20,9 +20,8 @@ export default function HealthGauge({ score }: HealthGaugeProps) {
           cy={center}
           r={radius}
           fill="none"
-          stroke="currentColor"
+          stroke="#1a2238"
           strokeWidth={stroke}
-          className="text-gray-200 dark:text-gray-700"
         />
         <circle
           cx={center}

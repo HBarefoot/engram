@@ -133,11 +133,9 @@ export default function ImportWizard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Smart Import Wizard
-        </h2>
-        <span className="text-sm text-gray-500 dark:text-gray-400">
+      <div className="page-head flex items-center justify-between" style={{ marginBottom: 0 }}>
+        <h2>Smart Import Wizard</h2>
+        <span className="text-sm" style={{ color: 'var(--text-mid)' }}>
           Bootstrap memories from your existing tools
         </span>
       </div>
@@ -146,46 +144,48 @@ export default function ImportWizard() {
       <div className="flex items-center space-x-2">
         {STEPS.map((name, i) => (
           <div key={name} className="flex items-center">
-            <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
-              i < step ? 'bg-green-500 text-white' :
-              i === step ? 'bg-primary-600 text-white' :
-              'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
-            }`}>
+            <div
+              className="flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium"
+              style={
+                i < step ? { background: 'var(--success)', color: 'var(--text-on-accent)' } :
+                i === step ? { background: 'var(--accent)', color: 'var(--text-on-accent)' } :
+                { background: 'var(--surface-3)', color: 'var(--text-mid)' }
+              }
+            >
               {i < step ? '\u2713' : i + 1}
             </div>
-            <span className={`ml-2 text-sm ${
-              i === step ? 'text-gray-900 dark:text-white font-medium' : 'text-gray-500 dark:text-gray-400'
-            }`}>
+            <span
+              className="ml-2 text-sm"
+              style={i === step ? { color: 'var(--text-hi)', fontWeight: 500 } : { color: 'var(--text-mid)' }}
+            >
               {name}
             </span>
             {i < STEPS.length - 1 && (
-              <div className={`mx-3 h-px w-8 ${
-                i < step ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
-              }`} />
+              <div className="mx-3 h-px w-8" style={{ background: i < step ? 'var(--success)' : 'var(--border-strong)' }} />
             )}
           </div>
         ))}
       </div>
 
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <p className="text-red-700 dark:text-red-400 text-sm">{error}</p>
+        <div className="card card--pad" style={{ borderColor: 'color-mix(in oklab, var(--danger) 35%, transparent)', background: 'color-mix(in oklab, var(--danger) 10%, var(--surface-1))' }}>
+          <p className="text-sm" style={{ color: 'var(--danger)' }}>{error}</p>
         </div>
       )}
 
       {/* Step 0: Select Sources */}
       {step === 0 && (
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+        <div className="card card--pad">
+          <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-hi)' }}>
             Select Import Sources
           </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+          <p className="text-sm mb-4" style={{ color: 'var(--text-mid)' }}>
             Sources with a green badge were auto-detected on your system.
           </p>
 
           {/* Extra paths management */}
-          <div className="mb-4 p-3 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900">
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Additional scan directories</p>
+          <div className="mb-4 p-3 rounded-lg" style={{ border: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+            <p className="text-sm font-medium mb-2" style={{ color: 'var(--text-hi)' }}>Additional scan directories</p>
             <div className="flex gap-2 mb-2">
               <input
                 type="text"
@@ -193,12 +193,12 @@ export default function ImportWizard() {
                 onChange={(e) => setNewPath(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && addPath()}
                 placeholder="e.g. ~/repos/my-project"
-                className="flex-1 text-sm border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400"
+                className="field flex-1"
               />
               <button
                 onClick={addPath}
                 disabled={!newPath.trim()}
-                className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
+                className="btn disabled:opacity-50"
               >
                 Add
               </button>
@@ -206,9 +206,9 @@ export default function ImportWizard() {
             {extraPaths.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {extraPaths.map(p => (
-                  <span key={p} className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded">
+                  <span key={p} className="badge badge--neutral mono">
                     {p}
-                    <button onClick={() => removePath(p)} className="text-gray-400 hover:text-red-500">&times;</button>
+                    <button onClick={() => removePath(p)} style={{ color: 'var(--text-lo)' }} className="hover:opacity-70">&times;</button>
                   </span>
                 ))}
               </div>
@@ -216,54 +216,57 @@ export default function ImportWizard() {
           </div>
 
           <div className="flex gap-2 mb-4">
-            <button onClick={selectAll} className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400">
+            <button onClick={selectAll} className="text-sm" style={{ color: 'var(--accent)' }}>
               Select all found
             </button>
-            <span className="text-gray-300 dark:text-gray-600">|</span>
-            <button onClick={deselectAll} className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400">
+            <span style={{ color: 'var(--border-strong)' }}>|</span>
+            <button onClick={deselectAll} className="text-sm" style={{ color: 'var(--text-mid)' }}>
               Deselect all
             </button>
           </div>
 
           {loading ? (
-            <div className="text-center py-8 text-gray-500">Detecting sources...</div>
+            <div className="text-center py-8" style={{ color: 'var(--text-mid)' }}>Detecting sources...</div>
           ) : (
             <div className="grid gap-3">
               {sources.map(source => (
                 <label
                   key={source.id}
-                  className={`flex items-center p-4 border rounded-lg cursor-pointer transition-colors ${
-                    selectedSources.includes(source.id)
-                      ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                  } ${!source.detected?.found ? 'opacity-50' : ''}`}
+                  className="flex items-center p-4 rounded-lg cursor-pointer transition-colors card--inset"
+                  style={{
+                    border: '1px solid',
+                    borderColor: selectedSources.includes(source.id) ? 'var(--accent-line)' : 'var(--border)',
+                    boxShadow: selectedSources.includes(source.id) ? 'var(--glow)' : 'none',
+                    opacity: !source.detected?.found ? 0.5 : 1
+                  }}
                 >
                   <input
                     type="checkbox"
                     checked={selectedSources.includes(source.id)}
                     onChange={() => toggleSource(source.id)}
                     disabled={!source.detected?.found}
-                    className="mr-3 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    className="mr-3"
+                    style={{ accentColor: 'var(--accent)' }}
                   />
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900 dark:text-white">{source.label}</span>
+                      <span className="font-medium" style={{ color: 'var(--text-hi)' }}>{source.label}</span>
                       {source.detected?.found ? (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                        <span className="badge badge--pattern">
                           Found
                         </span>
                       ) : (
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                        <span className="badge badge--neutral">
                           Not found
                         </span>
                       )}
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                      <span className="badge badge--fact">
                         {source.category}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{source.description}</p>
+                    <p className="text-sm mt-1" style={{ color: 'var(--text-mid)' }}>{source.description}</p>
                     {source.detected?.paths && source.detected.paths.length > 1 && (
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      <p className="text-xs mt-1" style={{ color: 'var(--text-lo)' }}>
                         Found in: {source.detected.paths.join(', ')}
                       </p>
                     )}
@@ -277,7 +280,7 @@ export default function ImportWizard() {
             <button
               onClick={handleScan}
               disabled={selectedSources.length === 0 || loading}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn btn--primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Scan Selected Sources ({selectedSources.length})
             </button>
@@ -287,36 +290,36 @@ export default function ImportWizard() {
 
       {/* Step 1: Scanning */}
       {step === 1 && loading && (
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-12 text-center">
-          <div className="inline-block w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mb-4" />
-          <p className="text-gray-600 dark:text-gray-300">Scanning sources...</p>
-          <p className="text-sm text-gray-400 mt-2">Extracting memories from {selectedSources.length} source(s)</p>
+        <div className="card card--pad text-center" style={{ padding: '48px' }}>
+          <div className="spinner mx-auto mb-4" style={{ width: '32px', height: '32px' }} />
+          <p style={{ color: 'var(--text-mid)' }}>Scanning sources...</p>
+          <p className="text-sm mt-2" style={{ color: 'var(--text-lo)' }}>Extracting memories from {selectedSources.length} source(s)</p>
         </div>
       )}
 
       {/* Step 2: Preview & Edit */}
       {step === 2 && (
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+        <div className="card card--pad">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h3 className="text-lg font-semibold" style={{ color: 'var(--text-hi)' }}>
               Preview Extracted Memories ({memories.length})
             </h3>
             <div className="flex gap-2">
-              <button onClick={selectAllMemories} className="text-sm text-primary-600 hover:text-primary-700 dark:text-primary-400">
+              <button onClick={selectAllMemories} className="text-sm" style={{ color: 'var(--accent)' }}>
                 Select all
               </button>
-              <span className="text-gray-300 dark:text-gray-600">|</span>
-              <button onClick={deselectAllMemories} className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400">
+              <span style={{ color: 'var(--border-strong)' }}>|</span>
+              <button onClick={deselectAllMemories} className="text-sm" style={{ color: 'var(--text-mid)' }}>
                 Deselect all
               </button>
             </div>
           </div>
 
           {scanResult?.warnings?.length > 0 && (
-            <div className="mb-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
-              <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400 mb-1">Warnings:</p>
+            <div className="mb-4 rounded-lg p-3" style={{ border: '1px solid color-mix(in oklab, var(--warn) 35%, transparent)', background: 'color-mix(in oklab, var(--warn) 10%, var(--surface-1))' }}>
+              <p className="text-sm font-medium mb-1" style={{ color: 'var(--warn)' }}>Warnings:</p>
               {scanResult.warnings.map((w, i) => (
-                <p key={i} className="text-sm text-yellow-600 dark:text-yellow-500">{w}</p>
+                <p key={i} className="text-sm" style={{ color: 'var(--text-mid)' }}>{w}</p>
               ))}
             </div>
           )}
@@ -325,38 +328,43 @@ export default function ImportWizard() {
             {memories.map((memory, index) => (
               <div
                 key={index}
-                className={`border rounded-lg p-3 transition-colors ${
-                  memory.selected
-                    ? 'border-primary-200 dark:border-primary-800 bg-white dark:bg-gray-800'
-                    : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 opacity-60'
-                }`}
+                className="rounded-lg p-3 transition-colors"
+                style={{
+                  border: '1px solid',
+                  borderColor: memory.selected ? 'var(--accent-line)' : 'var(--border)',
+                  background: 'var(--surface-2)',
+                  opacity: memory.selected ? 1 : 0.6
+                }}
               >
                 <div className="flex items-start gap-3">
                   <input
                     type="checkbox"
                     checked={memory.selected}
                     onChange={() => toggleMemory(index)}
-                    className="mt-1 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                    className="mt-1"
+                    style={{ accentColor: 'var(--accent)' }}
                   />
                   <div className="flex-1 min-w-0">
                     <textarea
                       value={memory.content}
                       onChange={(e) => updateMemory(index, 'content', e.target.value)}
                       rows={2}
-                      className="w-full text-sm border-0 bg-transparent text-gray-900 dark:text-white resize-none focus:ring-0 p-0"
+                      className="w-full text-sm border-0 bg-transparent resize-none focus:ring-0 p-0"
+                      style={{ color: 'var(--text-hi)' }}
                     />
                     <div className="flex items-center gap-3 mt-2">
                       <select
                         value={memory.category}
                         onChange={(e) => updateMemory(index, 'category', e.target.value)}
-                        className="text-xs border border-gray-200 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300"
+                        className="text-xs rounded px-2 py-1"
+                        style={{ border: '1px solid var(--border)', background: 'var(--surface-3)', color: 'var(--text-mid)' }}
                       >
                         {CATEGORIES.map(c => (
                           <option key={c} value={c}>{c}</option>
                         ))}
                       </select>
                       <div className="flex items-center gap-1">
-                        <span className="text-xs text-gray-400">Confidence:</span>
+                        <span className="text-xs" style={{ color: 'var(--text-lo)' }}>Confidence:</span>
                         <input
                           type="range"
                           min="0"
@@ -364,16 +372,18 @@ export default function ImportWizard() {
                           step="0.05"
                           value={memory.confidence}
                           onChange={(e) => updateMemory(index, 'confidence', parseFloat(e.target.value))}
-                          className="w-20 h-1 accent-primary-500"
+                          className="w-20 h-1"
+                          style={{ accentColor: 'var(--accent)' }}
                         />
-                        <span className="text-xs text-gray-500 w-8">{memory.confidence.toFixed(2)}</span>
+                        <span className="text-xs w-8" style={{ color: 'var(--text-mid)' }}>{memory.confidence.toFixed(2)}</span>
                       </div>
-                      <span className="text-xs text-gray-400">{memory.source}</span>
+                      <span className="text-xs mono" style={{ color: 'var(--text-lo)' }}>{memory.source}</span>
                     </div>
                   </div>
                   <button
                     onClick={() => deleteMemory(index)}
-                    className="text-gray-400 hover:text-red-500 text-sm p-1"
+                    className="text-sm p-1 hover:opacity-70"
+                    style={{ color: 'var(--text-lo)' }}
                     title="Remove"
                   >
                     &times;
@@ -386,14 +396,14 @@ export default function ImportWizard() {
           <div className="mt-6 flex items-center justify-between">
             <button
               onClick={() => setStep(0)}
-              className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+              className="btn btn--ghost"
             >
               Back
             </button>
             <button
               onClick={handleCommit}
               disabled={selectedCount === 0 || loading}
-              className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn btn--primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Commit {selectedCount} Memories
             </button>
@@ -403,41 +413,41 @@ export default function ImportWizard() {
 
       {/* Step 3: Committing */}
       {step === 3 && loading && (
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-12 text-center">
-          <div className="inline-block w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mb-4" />
-          <p className="text-gray-600 dark:text-gray-300">Committing memories...</p>
-          <p className="text-sm text-gray-400 mt-2">Generating embeddings and deduplicating</p>
+        <div className="card card--pad text-center" style={{ padding: '48px' }}>
+          <div className="spinner mx-auto mb-4" style={{ width: '32px', height: '32px' }} />
+          <p style={{ color: 'var(--text-mid)' }}>Committing memories...</p>
+          <p className="text-sm mt-2" style={{ color: 'var(--text-lo)' }}>Generating embeddings and deduplicating</p>
         </div>
       )}
 
       {/* Step 4: Done */}
       {step === 4 && commitResult && (
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-8 text-center">
-          <div className="text-4xl mb-4">&#10003;</div>
-          <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+        <div className="card card--pad text-center">
+          <div className="text-4xl mb-4" style={{ color: 'var(--success)' }}>&#10003;</div>
+          <h3 className="text-xl font-semibold mb-4" style={{ color: 'var(--text-hi)' }}>
             Import Complete
           </h3>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-lg mx-auto mb-6">
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
-              <div className="text-2xl font-bold text-green-600 dark:text-green-400">{commitResult.created}</div>
-              <div className="text-xs text-green-700 dark:text-green-500">Created</div>
+            <div className="rounded-lg p-3" style={{ background: 'color-mix(in oklab, var(--success) 12%, var(--surface-1))' }}>
+              <div className="text-2xl font-bold" style={{ color: 'var(--success)' }}>{commitResult.created}</div>
+              <div className="text-xs" style={{ color: 'var(--success)' }}>Created</div>
             </div>
-            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{commitResult.merged}</div>
-              <div className="text-xs text-blue-700 dark:text-blue-500">Merged</div>
+            <div className="rounded-lg p-3" style={{ background: 'color-mix(in oklab, var(--info) 12%, var(--surface-1))' }}>
+              <div className="text-2xl font-bold" style={{ color: 'var(--info)' }}>{commitResult.merged}</div>
+              <div className="text-xs" style={{ color: 'var(--info)' }}>Merged</div>
             </div>
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-3">
-              <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{commitResult.duplicates}</div>
-              <div className="text-xs text-yellow-700 dark:text-yellow-500">Duplicates</div>
+            <div className="rounded-lg p-3" style={{ background: 'color-mix(in oklab, var(--warn) 12%, var(--surface-1))' }}>
+              <div className="text-2xl font-bold" style={{ color: 'var(--warn)' }}>{commitResult.duplicates}</div>
+              <div className="text-xs" style={{ color: 'var(--warn)' }}>Duplicates</div>
             </div>
-            <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3">
-              <div className="text-2xl font-bold text-red-600 dark:text-red-400">{commitResult.rejected}</div>
-              <div className="text-xs text-red-700 dark:text-red-500">Rejected</div>
+            <div className="rounded-lg p-3" style={{ background: 'color-mix(in oklab, var(--danger) 12%, var(--surface-1))' }}>
+              <div className="text-2xl font-bold" style={{ color: 'var(--danger)' }}>{commitResult.rejected}</div>
+              <div className="text-xs" style={{ color: 'var(--danger)' }}>Rejected</div>
             </div>
           </div>
 
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+          <p className="text-sm mb-6" style={{ color: 'var(--text-mid)' }}>
             Completed in {commitResult.duration}ms
           </p>
 
@@ -451,7 +461,7 @@ export default function ImportWizard() {
                 setExtraPaths([]);
                 setNewPath('');
               }}
-              className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              className="btn btn--ghost"
             >
               Import More
             </button>

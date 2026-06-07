@@ -1,16 +1,9 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
-
-const CATEGORY_COLORS = {
-  preference: '#a855f7',
-  fact: '#3b82f6',
-  pattern: '#22c55e',
-  decision: '#eab308',
-  outcome: '#ef4444'
-};
+import { CATEGORY_COLORS } from '../utils/categories';
 
 export default function CategoryChart({ data }) {
   if (!data || Object.keys(data).length === 0) {
-    return <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-8">No data</p>;
+    return <p className="text-sm text-ink-mid text-center py-8">No data</p>;
   }
 
   const chartData = Object.entries(data)
@@ -18,7 +11,7 @@ export default function CategoryChart({ data }) {
     .map(([name, value]) => ({ name, value }));
 
   if (chartData.length === 0) {
-    return <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-8">No memories yet</p>;
+    return <p className="text-sm text-ink-mid text-center py-8">No memories yet</p>;
   }
 
   return (
@@ -35,17 +28,19 @@ export default function CategoryChart({ data }) {
             stroke="none"
           >
             {chartData.map(entry => (
-              <Cell key={entry.name} fill={CATEGORY_COLORS[entry.name] || '#6b7280'} />
+              <Cell key={entry.name} fill={CATEGORY_COLORS[entry.name] || 'var(--text-lo)'} />
             ))}
           </Pie>
           <Tooltip
             contentStyle={{
-              backgroundColor: '#1f2937',
-              border: '1px solid #374151',
-              borderRadius: '0.5rem',
-              color: '#f3f4f6',
+              background: 'var(--surface-2)',
+              border: '1px solid var(--border)',
+              borderRadius: '12px',
+              color: 'var(--text-hi)',
               fontSize: '0.75rem'
             }}
+            labelStyle={{ color: 'var(--text-mid)' }}
+            itemStyle={{ color: 'var(--text-mid)' }}
           />
         </PieChart>
       </ResponsiveContainer>
@@ -54,10 +49,10 @@ export default function CategoryChart({ data }) {
           <div key={entry.name} className="flex items-center gap-2 text-sm">
             <span
               className="w-3 h-3 rounded-full flex-shrink-0"
-              style={{ backgroundColor: CATEGORY_COLORS[entry.name] || '#6b7280' }}
+              style={{ backgroundColor: CATEGORY_COLORS[entry.name] || 'var(--text-lo)' }}
             />
-            <span className="capitalize text-gray-700 dark:text-gray-300">{entry.name}</span>
-            <span className="ml-auto text-gray-500 dark:text-gray-400">{entry.value}</span>
+            <span className="capitalize text-ink-hi">{entry.name}</span>
+            <span className="ml-auto text-ink-mid">{entry.value}</span>
           </div>
         ))}
       </div>

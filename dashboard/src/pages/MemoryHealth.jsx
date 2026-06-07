@@ -3,6 +3,7 @@ import { api } from '../utils/api';
 import HealthGauge from '../components/HealthGauge';
 import TrendsChart from '../components/TrendsChart';
 import CategoryChart from '../components/CategoryChart';
+import { categoryBadgeClass } from '../utils/categories';
 
 export default function MemoryHealth() {
   const [overview, setOverview] = useState(null);
@@ -114,27 +115,29 @@ export default function MemoryHealth() {
   if (loading) {
     return (
       <div className="flex justify-center py-20">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500" />
+        <div className="spinner" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-        <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
-        <button onClick={loadData} className="mt-2 text-sm text-red-700 dark:text-red-300 underline">Retry</button>
+      <div className="card card--pad" style={{ borderColor: 'var(--danger)' }}>
+        <p className="text-sm" style={{ color: 'var(--danger)' }}>{error}</p>
+        <button onClick={loadData} className="mt-2 text-sm underline" style={{ color: 'var(--danger)' }}>Retry</button>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Memory Health</h1>
+      <div className="page-head" style={{ marginBottom: 0 }}>
+        <h2>Memory Health</h2>
+      </div>
 
       {/* Section 1 + 2: Health Score + Quick Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
-        <div className="lg:col-span-1 bg-white dark:bg-gray-800 shadow rounded-lg p-6 flex items-center justify-center">
+        <div className="lg:col-span-1 card card--pad flex items-center justify-center">
           <HealthGauge score={overview?.healthScore || 0} />
         </div>
         <div className="lg:col-span-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -150,12 +153,12 @@ export default function MemoryHealth() {
 
       {/* Section 3 + 4: Category Distribution + Trends */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-          <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-4">Category Distribution</h2>
+        <div className="card card--pad">
+          <h2 className="eyebrow mb-4">Category Distribution</h2>
           <CategoryChart data={overview?.byCategory} />
         </div>
-        <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-          <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-4">Memories Created (Last 30 Days)</h2>
+        <div className="card card--pad">
+          <h2 className="eyebrow mb-4">Memories Created (Last 30 Days)</h2>
           <TrendsChart data={trends?.daily} />
         </div>
       </div>
@@ -183,20 +186,22 @@ export default function MemoryHealth() {
       </div>
 
       {/* Section 6: Cleanup Actions */}
-      <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-        <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-4">Cleanup Actions</h2>
+      <div className="card card--pad">
+        <h2 className="eyebrow mb-4">Cleanup Actions</h2>
         <div className="flex flex-wrap gap-3">
           <button
             onClick={handleCleanStale}
             disabled={cleaning || !stale?.count}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-yellow-50 text-yellow-700 border border-yellow-200 hover:bg-yellow-100 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-yellow-900/20 dark:text-yellow-300 dark:border-yellow-800 dark:hover:bg-yellow-900/40"
+            className="btn btn--ghost disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ color: 'var(--warn)', borderColor: 'color-mix(in oklab, var(--warn) 35%, transparent)' }}
           >
             {cleaning ? 'Cleaning...' : `Clean ${stale?.count || 0} stale memories`}
           </button>
           <button
             onClick={handleCleanNeverRecalled}
             disabled={cleaning || !neverRecalled?.count}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-800 dark:hover:bg-orange-900/40"
+            className="btn btn--ghost disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ color: 'var(--warn)', borderColor: 'color-mix(in oklab, var(--warn) 35%, transparent)' }}
           >
             {cleaning ? 'Cleaning...' : confirmCleanNeverRecalled
               ? `Confirm delete ${neverRecalled?.count || 0}?`
@@ -205,7 +210,7 @@ export default function MemoryHealth() {
           {confirmCleanNeverRecalled && (
             <button
               onClick={() => setConfirmCleanNeverRecalled(false)}
-              className="px-4 py-2 text-sm font-medium rounded-lg bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-600"
+              className="btn btn--ghost"
             >
               Cancel
             </button>
@@ -213,13 +218,14 @@ export default function MemoryHealth() {
           <button
             onClick={handleMergeDuplicates}
             disabled={cleaning || !duplicates?.totalDuplicates}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-red-900/20 dark:text-red-300 dark:border-red-800 dark:hover:bg-red-900/40"
+            className="btn btn--ghost disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ color: 'var(--danger)', borderColor: 'color-mix(in oklab, var(--danger) 35%, transparent)' }}
           >
             {cleaning ? 'Merging...' : `Merge ${duplicates?.totalDuplicates || 0} duplicates`}
           </button>
         </div>
         {cleanResult && (
-          <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">{cleanResult}</p>
+          <p className="mt-3 text-sm text-ink-mid">{cleanResult}</p>
         )}
       </div>
 
@@ -250,57 +256,48 @@ export default function MemoryHealth() {
 
 function StatCard({ label, value }) {
   return (
-    <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-4">
-      <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{label}</p>
-      <p className="mt-1 text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
+    <div className="stat">
+      <p className="stat__label">{label}</p>
+      <p className="stat__value text-ink-hi">{value}</p>
     </div>
   );
 }
 
 function InsightCard({ title, count, description, color }) {
-  const colors = {
-    yellow: 'bg-yellow-50 border-yellow-200 dark:bg-yellow-900/20 dark:border-yellow-800',
-    orange: 'bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800',
-    red: 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800'
+  const colorVars = {
+    yellow: 'var(--warn)',
+    orange: 'var(--warn)',
+    red: 'var(--danger)'
   };
-  const textColors = {
-    yellow: 'text-yellow-700 dark:text-yellow-300',
-    orange: 'text-orange-700 dark:text-orange-300',
-    red: 'text-red-700 dark:text-red-300'
-  };
+  const c = colorVars[color] || 'var(--text-mid)';
 
   return (
-    <div className={`rounded-lg border p-4 ${colors[color]}`}>
-      <p className={`text-2xl font-bold ${textColors[color]}`}>{count}</p>
-      <p className={`text-sm font-medium ${textColors[color]}`}>{title}</p>
-      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{description}</p>
+    <div
+      className="card card--pad"
+      style={{ borderColor: `color-mix(in oklab, ${c} 35%, transparent)`, background: `color-mix(in oklab, ${c} 8%, var(--surface-1))` }}
+    >
+      <p className="text-2xl font-bold" style={{ color: c }}>{count}</p>
+      <p className="text-sm font-medium" style={{ color: c }}>{title}</p>
+      <p className="text-xs text-ink-mid mt-1">{description}</p>
     </div>
   );
 }
 
 function MemoryTable({ title, items, columns, columnLabels, onDelete, deletingId }) {
-  const CATEGORY_COLORS = {
-    preference: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
-    fact: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
-    pattern: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
-    decision: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
-    outcome: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
-  };
-
   return (
-    <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-      <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-4">{title}</h2>
+    <div className="card card--pad">
+      <h2 className="eyebrow mb-4">{title}</h2>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="tbl">
           <thead>
-            <tr className="border-b border-gray-200 dark:border-gray-700">
+            <tr>
               {columns.map(col => (
-                <th key={col} className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
+                <th key={col}>
                   {columnLabels[col]}
                 </th>
               ))}
               {onDelete && (
-                <th className="text-right py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase w-20">
+                <th className="text-right w-20">
                   Actions
                 </th>
               )}
@@ -308,13 +305,13 @@ function MemoryTable({ title, items, columns, columnLabels, onDelete, deletingId
           </thead>
           <tbody>
             {items.slice(0, 10).map(item => (
-              <tr key={item.id} className="border-b border-gray-100 dark:border-gray-700/50">
+              <tr key={item.id}>
                 {columns.map(col => (
-                  <td key={col} className="py-2 px-3 text-gray-700 dark:text-gray-300">
+                  <td key={col} className={col === 'content' ? 'hi' : ''}>
                     {col === 'content' ? (
                       <span className="line-clamp-1 max-w-xs">{item[col]}</span>
                     ) : col === 'category' ? (
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${CATEGORY_COLORS[item[col]] || ''}`}>
+                      <span className={categoryBadgeClass(item[col])}>
                         {item[col]}
                       </span>
                     ) : (
@@ -323,11 +320,12 @@ function MemoryTable({ title, items, columns, columnLabels, onDelete, deletingId
                   </td>
                 ))}
                 {onDelete && (
-                  <td className="py-2 px-3 text-right">
+                  <td className="text-right">
                     <button
                       onClick={() => onDelete(item.id)}
                       disabled={deletingId === item.id}
-                      className="text-xs px-2 py-1 rounded text-red-600 hover:bg-red-50 hover:text-red-700 disabled:opacity-50 dark:text-red-400 dark:hover:bg-red-900/30 dark:hover:text-red-300"
+                      className="btn btn--ghost btn--sm disabled:opacity-50"
+                      style={{ color: 'var(--danger)', borderColor: 'color-mix(in oklab, var(--danger) 35%, transparent)' }}
                     >
                       {deletingId === item.id ? 'Deleting...' : 'Delete'}
                     </button>
@@ -338,7 +336,7 @@ function MemoryTable({ title, items, columns, columnLabels, onDelete, deletingId
           </tbody>
         </table>
         {items.length > 10 && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">Showing 10 of {items.length}</p>
+          <p className="text-xs text-ink-mid mt-2">Showing 10 of {items.length}</p>
         )}
       </div>
     </div>

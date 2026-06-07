@@ -69,17 +69,16 @@ export default function Onboarding({ onComplete }) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 flex items-center justify-center p-4">
-      <div className="max-w-2xl w-full bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
+    <div className="flex items-center justify-center p-4" style={{ background: 'var(--bg-sunken)', minHeight: '100vh' }}>
+      <div className="card card--pad max-w-2xl w-full" style={{ borderRadius: 'var(--r-xl)', boxShadow: 'var(--sh-3)' }}>
 
         {/* Step indicator */}
         <div className="flex gap-1 mb-8">
           {STEPS.map((s, i) => (
             <div
               key={s}
-              className={`flex-1 h-1.5 rounded-full transition-colors ${
-                i <= step ? 'bg-primary-500' : 'bg-gray-200 dark:bg-gray-700'
-              }`}
+              className="flex-1 h-1.5 rounded-full transition-colors"
+              style={{ background: i <= step ? 'var(--accent)' : 'var(--surface-3)' }}
             />
           ))}
         </div>
@@ -88,27 +87,27 @@ export default function Onboarding({ onComplete }) {
         {step === 0 && (
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <img src="/engram-logo.png" alt="Engram" className="h-10 w-10 rounded-lg" />
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Welcome to Engram</h1>
+              <img src="/engram-logo.png" alt="Engram" className="h-10 w-10 rounded-xl" />
+              <h1 className="text-3xl font-bold" style={{ color: 'var(--text-hi)' }}>Welcome to Engram</h1>
             </div>
-            <p className="text-gray-600 dark:text-gray-300 mb-4">
+            <p className="mb-4" style={{ color: 'var(--text-mid)' }}>
               Engram gives your AI agent the memory of a colleague who's worked with you for years —
               without cloud, API keys, or Docker. Everything stays on your machine.
             </p>
-            <p className="text-gray-600 dark:text-gray-300 mb-4">
+            <p className="mb-4" style={{ color: 'var(--text-mid)' }}>
               Three quick steps to get you set up:
             </p>
-            <ul className="space-y-2 text-gray-700 dark:text-gray-300">
+            <ul className="space-y-2" style={{ color: 'var(--text-mid)' }}>
               <li className="flex items-start gap-2">
-                <span className="text-primary-500 font-semibold">1.</span>
+                <span className="font-semibold" style={{ color: 'var(--accent)' }}>1.</span>
                 Connect your AI agent so it can read and write memories.
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-primary-500 font-semibold">2.</span>
+                <span className="font-semibold" style={{ color: 'var(--accent)' }}>2.</span>
                 Seed your first memory (optional — your agent can do this for you later).
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-primary-500 font-semibold">3.</span>
+                <span className="font-semibold" style={{ color: 'var(--accent)' }}>3.</span>
                 Open the dashboard and start using Engram.
               </li>
             </ul>
@@ -117,23 +116,23 @@ export default function Onboarding({ onComplete }) {
 
         {step === 1 && (
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Connect your AI agent</h1>
-            <p className="text-gray-600 dark:text-gray-300 mb-4">
+            <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--text-hi)' }}>Connect your AI agent</h1>
+            <p className="mb-4" style={{ color: 'var(--text-mid)' }}>
               Add this block to your MCP client config:
             </p>
-            <pre className="bg-gray-900 text-gray-100 rounded-lg p-4 text-sm overflow-x-auto mb-4">
+            <pre className="rounded-lg p-4 text-sm overflow-x-auto mb-4 mono" style={{ background: 'var(--surface-2)', color: 'var(--text-hi)', border: '1px solid var(--border)' }}>
               <code>{MCP_CONFIG_SNIPPET}</code>
             </pre>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">Supported clients:</p>
+            <p className="text-sm mb-3" style={{ color: 'var(--text-mid)' }}>Supported clients:</p>
             <ul className="space-y-2">
               {SUPPORTED_CLIENTS.map(client => (
-                <li key={client.name} className="text-sm text-gray-700 dark:text-gray-300 flex justify-between gap-3 border-b border-gray-100 dark:border-gray-700 pb-1">
-                  <span className="font-medium">{client.name}</span>
-                  <code className="text-xs text-gray-500 dark:text-gray-400">{client.configHint}</code>
+                <li key={client.name} className="text-sm flex justify-between gap-3 pb-1" style={{ color: 'var(--text-mid)', borderBottom: '1px solid var(--border-soft)' }}>
+                  <span className="font-medium" style={{ color: 'var(--text-hi)' }}>{client.name}</span>
+                  <code className="text-xs mono" style={{ color: 'var(--text-lo)' }}>{client.configHint}</code>
                 </li>
               ))}
             </ul>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-4">
+            <p className="text-xs mt-4" style={{ color: 'var(--text-lo)' }}>
               The Agents page has a per-platform integration wizard if you'd like a guided setup.
             </p>
           </div>
@@ -141,13 +140,13 @@ export default function Onboarding({ onComplete }) {
 
         {step === 2 && (
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Seed a first memory</h1>
-            <p className="text-gray-600 dark:text-gray-300 mb-4">
+            <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--text-hi)' }}>Seed a first memory</h1>
+            <p className="mb-4" style={{ color: 'var(--text-mid)' }}>
               Optional. Add one thing you'd want your AI agent to remember about you or your work.
               You can always skip this and let memories accumulate naturally from your conversations.
             </p>
 
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="field-label">
               Memory content
             </label>
             <textarea
@@ -155,16 +154,16 @@ export default function Onboarding({ onComplete }) {
               onChange={e => setSeedContent(e.target.value)}
               rows={3}
               placeholder="e.g. I prefer Fastify over Express for Node APIs"
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 mb-3"
+              className="field mb-3"
             />
 
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="field-label">
               Category
             </label>
             <select
               value={seedCategory}
               onChange={e => setSeedCategory(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-900 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500 mb-4"
+              className="field mb-4"
             >
               <option value="preference">Preference (likes/dislikes)</option>
               <option value="fact">Fact (objective truth)</option>
@@ -174,7 +173,7 @@ export default function Onboarding({ onComplete }) {
             </select>
 
             <details className="mb-4">
-              <summary className="text-sm text-primary-600 dark:text-primary-400 cursor-pointer hover:underline">
+              <summary className="text-sm cursor-pointer hover:underline" style={{ color: 'var(--accent)' }}>
                 Need ideas? Show examples
               </summary>
               <div className="mt-2 space-y-2">
@@ -186,9 +185,10 @@ export default function Onboarding({ onComplete }) {
                       setSeedContent(ex.content);
                       setSeedCategory(ex.category);
                     }}
-                    className="block w-full text-left text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 hover:bg-gray-100 dark:hover:bg-gray-700 rounded p-2"
+                    className="block w-full text-left text-sm rounded p-2 transition-colors"
+                    style={{ background: 'var(--surface-2)', color: 'var(--text-mid)', border: '1px solid var(--border)' }}
                   >
-                    <span className="font-medium text-xs uppercase text-gray-500 dark:text-gray-400 mr-2">
+                    <span className="font-medium text-xs uppercase mr-2 mono" style={{ color: 'var(--text-lo)' }}>
                       {ex.label}
                     </span>
                     {ex.content}
@@ -198,7 +198,7 @@ export default function Onboarding({ onComplete }) {
             </details>
 
             {error && (
-              <div className="text-sm text-red-600 dark:text-red-400 mb-2">{error}</div>
+              <div className="text-sm mb-2" style={{ color: 'var(--danger)' }}>{error}</div>
             )}
           </div>
         )}
@@ -207,16 +207,16 @@ export default function Onboarding({ onComplete }) {
           <div>
             <div className="flex items-center gap-3 mb-4">
               <span className="text-3xl">🎉</span>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">You're set</h1>
+              <h1 className="text-2xl font-bold" style={{ color: 'var(--text-hi)' }}>You're set</h1>
             </div>
-            <p className="text-gray-600 dark:text-gray-300 mb-3">
+            <p className="mb-3" style={{ color: 'var(--text-mid)' }}>
               Engram is running on your machine. Once your AI agent is connected, it can
-              <code className="text-sm bg-gray-100 dark:bg-gray-900 px-1 py-0.5 rounded mx-1">engram_remember</code>
+              <code className="text-sm px-1 py-0.5 rounded mx-1 mono" style={{ background: 'var(--surface-2)', color: 'var(--text-hi)' }}>engram_remember</code>
               and
-              <code className="text-sm bg-gray-100 dark:bg-gray-900 px-1 py-0.5 rounded mx-1">engram_recall</code>
+              <code className="text-sm px-1 py-0.5 rounded mx-1 mono" style={{ background: 'var(--surface-2)', color: 'var(--text-hi)' }}>engram_recall</code>
               memories about you across sessions.
             </p>
-            <p className="text-gray-600 dark:text-gray-300">
+            <p style={{ color: 'var(--text-mid)' }}>
               From the dashboard you can browse, search, edit, and resolve memory conflicts.
               The Agents page has integration guides if you skipped that step.
             </p>
@@ -224,11 +224,11 @@ export default function Onboarding({ onComplete }) {
         )}
 
         {/* Navigation */}
-        <div className="mt-8 flex items-center justify-between border-t border-gray-100 dark:border-gray-700 pt-6">
+        <div className="mt-8 flex items-center justify-between pt-6" style={{ borderTop: '1px solid var(--border-soft)' }}>
           <button
             type="button"
             onClick={finish}
-            className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
+            className="btn btn--ghost btn--sm"
           >
             Skip onboarding
           </button>
@@ -238,7 +238,7 @@ export default function Onboarding({ onComplete }) {
               <button
                 type="button"
                 onClick={back}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
+                className="btn btn--ghost"
               >
                 Back
               </button>
@@ -248,7 +248,7 @@ export default function Onboarding({ onComplete }) {
               <button
                 type="button"
                 onClick={next}
-                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md"
+                className="btn btn--primary"
               >
                 Next
               </button>
@@ -259,7 +259,7 @@ export default function Onboarding({ onComplete }) {
                 type="button"
                 onClick={saveSeedAndNext}
                 disabled={saving}
-                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md disabled:opacity-50"
+                className="btn btn--primary"
               >
                 {saving ? 'Saving…' : seedContent.trim() ? 'Save & continue' : 'Skip this step'}
               </button>
@@ -269,7 +269,7 @@ export default function Onboarding({ onComplete }) {
               <button
                 type="button"
                 onClick={finish}
-                className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md"
+                className="btn btn--primary"
               >
                 Open Dashboard
               </button>

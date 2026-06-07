@@ -50,32 +50,32 @@ export default function CreateMemoryModal({ onClose, onSuccess }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-      <div className="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-              Create New Memory
-            </h3>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
-            >
-              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+    <div className="modal-overlay">
+      <div className="modal">
+        <div className="modal__head">
+          <h3 className="text-lg font-medium text-ink-hi">
+            Create New Memory
+          </h3>
+          <button
+            onClick={onClose}
+            className="btn btn--icon btn--ghost"
+          >
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
 
+        <div className="modal__body">
           {error && (
-            <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3">
-              <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
+            <div className="mb-4 card card--pad" style={{ borderColor: 'var(--danger)', padding: '12px 14px' }}>
+              <p className="text-sm" style={{ color: 'var(--danger)' }}>{error}</p>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="field-label">
                 Content *
               </label>
               <textarea
@@ -83,20 +83,20 @@ export default function CreateMemoryModal({ onClose, onSuccess }) {
                 onChange={(e) => setFormData({ ...formData, content: e.target.value })}
                 rows="4"
                 placeholder="Enter the memory content..."
-                className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                className="field"
                 required
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="field-label">
                   Category
                 </label>
                 <select
                   value={formData.category}
                   onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                  className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  className="field"
                 >
                   <option value="fact">Fact</option>
                   <option value="preference">Preference</option>
@@ -107,7 +107,7 @@ export default function CreateMemoryModal({ onClose, onSuccess }) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="field-label">
                   Entity (optional)
                 </label>
                 <input
@@ -115,9 +115,9 @@ export default function CreateMemoryModal({ onClose, onSuccess }) {
                   value={formData.entity}
                   onChange={(e) => setFormData({ ...formData, entity: e.target.value })}
                   placeholder="e.g., docker, deployment"
-                  className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  className="field"
                 />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-1 text-xs text-ink-mid">
                   Auto-detected if not provided
                 </p>
               </div>
@@ -125,7 +125,7 @@ export default function CreateMemoryModal({ onClose, onSuccess }) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="field-label">
                   Confidence
                 </label>
                 <input
@@ -135,15 +135,15 @@ export default function CreateMemoryModal({ onClose, onSuccess }) {
                   step="0.1"
                   value={formData.confidence}
                   onChange={(e) => setFormData({ ...formData, confidence: e.target.value })}
-                  className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  className="field"
                 />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-1 text-xs text-ink-mid">
                   0.0 to 1.0 (default: 0.8)
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                <label className="field-label">
                   Namespace
                 </label>
                 <input
@@ -151,16 +151,16 @@ export default function CreateMemoryModal({ onClose, onSuccess }) {
                   value={formData.namespace}
                   onChange={(e) => setFormData({ ...formData, namespace: e.target.value })}
                   placeholder="default"
-                  className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  className="field"
                 />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-1 text-xs text-ink-mid">
                   Project or scope name
                 </p>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="field-label">
                 Tags (optional)
               </label>
               <input
@@ -168,9 +168,9 @@ export default function CreateMemoryModal({ onClose, onSuccess }) {
                 value={formData.tags}
                 onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
                 placeholder="tag1, tag2, tag3"
-                className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                className="field"
               />
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              <p className="mt-1 text-xs text-ink-mid">
                 Comma-separated tags
               </p>
             </div>
@@ -179,14 +179,14 @@ export default function CreateMemoryModal({ onClose, onSuccess }) {
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                className="btn btn--ghost"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn btn--primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Creating...' : 'Create Memory'}
               </button>
