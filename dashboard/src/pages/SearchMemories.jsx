@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from '../utils/api';
+import { categoryBadgeClass } from '../utils/categories';
 
 export default function SearchMemories() {
   const [query, setQuery] = useState('');
@@ -27,34 +28,21 @@ export default function SearchMemories() {
     }
   }
 
-  function getCategoryColor(category) {
-    const colors = {
-      preference: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-      fact: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-      pattern: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-      decision: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-      outcome: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-    };
-    return colors[category] || 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-          Search Memories
-        </h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+      <div className="page-head">
+        <h2>Search Memories</h2>
+        <p>
           Use hybrid search to find relevant memories based on semantic similarity, recency, and confidence.
         </p>
       </div>
 
       {/* Search Form */}
-      <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+      <div className="card card--pad">
         <form onSubmit={handleSearch} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label className="field-label">
               Search Query
             </label>
             <input
@@ -62,19 +50,19 @@ export default function SearchMemories() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="What do you want to remember?"
-              className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500 text-lg p-3"
+              className="field text-lg"
             />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="field-label">
                 Max Results
               </label>
               <select
                 value={options.limit}
                 onChange={(e) => setOptions({ ...options, limit: parseInt(e.target.value) })}
-                className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                className="field"
               >
                 <option value="3">3</option>
                 <option value="5">5</option>
@@ -83,13 +71,13 @@ export default function SearchMemories() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="field-label">
                 Threshold
               </label>
               <select
                 value={options.threshold}
                 onChange={(e) => setOptions({ ...options, threshold: parseFloat(e.target.value) })}
-                className="w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                className="field"
               >
                 <option value="0.1">0.1 (Low)</option>
                 <option value="0.3">0.3 (Medium)</option>
@@ -102,7 +90,7 @@ export default function SearchMemories() {
           <button
             type="submit"
             disabled={loading || !query.trim()}
-            className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn btn--primary w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? (
               <>
@@ -126,87 +114,87 @@ export default function SearchMemories() {
 
       {/* Error Message */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-          <p className="text-red-800 dark:text-red-200">Error: {error}</p>
+        <div className="card card--pad" style={{ borderColor: 'var(--danger)' }}>
+          <p style={{ color: 'var(--danger)' }}>Error: {error}</p>
         </div>
       )}
 
       {/* Results */}
       {results.length > 0 && (
         <div className="space-y-4">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
+          <h3 className="text-lg font-medium text-ink-hi">
             Found {results.length} result{results.length !== 1 ? 's' : ''}
           </h3>
-          <div className="bg-white dark:bg-gray-800 shadow overflow-hidden rounded-lg">
-            <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+          <div className="card overflow-hidden">
+            <ul>
               {results.map((memory, index) => (
-                <li key={memory.id} className="p-6">
-                  <div className="flex items-start">
+                <li key={memory.id} className="row" style={{ alignItems: 'flex-start' }}>
+                  <div className="flex items-start w-full">
                     <div className="flex-shrink-0">
-                      <div className="flex items-center justify-center h-10 w-10 rounded-full bg-primary-100 dark:bg-primary-900 text-primary-600 dark:text-primary-400 font-bold">
+                      <div className="flex items-center justify-center h-10 w-10 rounded-full font-bold mono" style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}>
                         #{index + 1}
                       </div>
                     </div>
                     <div className="ml-4 flex-1">
-                      <p className="text-base font-medium text-gray-900 dark:text-white">
+                      <p className="text-base font-medium text-ink-hi">
                         {memory.content}
                       </p>
                       <div className="mt-2 flex flex-wrap items-center gap-3">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryColor(memory.category)}`}>
+                        <span className={categoryBadgeClass(memory.category)}>
                           {memory.category}
                         </span>
                         {memory.entity && (
-                          <span className="text-sm text-gray-500 dark:text-gray-400">
+                          <span className="text-sm text-ink-mid">
                             Entity: {memory.entity}
                           </span>
                         )}
-                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                        <span className="text-sm text-ink-mid">
                           Score: {memory.score.toFixed(3)}
                         </span>
-                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                        <span className="text-sm text-ink-mid">
                           Confidence: {(memory.confidence * 100).toFixed(0)}%
                         </span>
                       </div>
                       {memory.scoreBreakdown && (
-                        <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                          <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        <div className="card card--inset mt-3 p-3">
+                          <p className="text-xs font-medium text-ink-mid mb-2">
                             Score Breakdown:
                           </p>
                           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
                             <div>
-                              <span className="text-gray-500 dark:text-gray-400">Similarity:</span>
-                              <span className="ml-1 font-medium text-gray-900 dark:text-white">
+                              <span className="text-ink-lo">Similarity:</span>
+                              <span className="ml-1 font-medium text-ink-hi mono">
                                 {memory.scoreBreakdown.similarity.toFixed(3)}
                               </span>
                             </div>
                             <div>
-                              <span className="text-gray-500 dark:text-gray-400">Recency:</span>
-                              <span className="ml-1 font-medium text-gray-900 dark:text-white">
+                              <span className="text-ink-lo">Recency:</span>
+                              <span className="ml-1 font-medium text-ink-hi mono">
                                 {memory.scoreBreakdown.recency.toFixed(3)}
                               </span>
                             </div>
                             <div>
-                              <span className="text-gray-500 dark:text-gray-400">Confidence:</span>
-                              <span className="ml-1 font-medium text-gray-900 dark:text-white">
+                              <span className="text-ink-lo">Confidence:</span>
+                              <span className="ml-1 font-medium text-ink-hi mono">
                                 {memory.scoreBreakdown.confidence.toFixed(3)}
                               </span>
                             </div>
                             <div>
-                              <span className="text-gray-500 dark:text-gray-400">Access:</span>
-                              <span className="ml-1 font-medium text-gray-900 dark:text-white">
+                              <span className="text-ink-lo">Access:</span>
+                              <span className="ml-1 font-medium text-ink-hi mono">
                                 {memory.scoreBreakdown.access.toFixed(3)}
                               </span>
                             </div>
                             <div>
-                              <span className="text-gray-500 dark:text-gray-400">FTS Boost:</span>
-                              <span className="ml-1 font-medium text-gray-900 dark:text-white">
+                              <span className="text-ink-lo">FTS Boost:</span>
+                              <span className="ml-1 font-medium text-ink-hi mono">
                                 {memory.scoreBreakdown.ftsBoost.toFixed(3)}
                               </span>
                             </div>
                           </div>
                         </div>
                       )}
-                      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                      <p className="mt-2 text-xs text-ink-lo">
                         Namespace: {memory.namespace} | Accessed: {memory.accessCount}x | ID: {memory.id.substring(0, 8)}
                       </p>
                     </div>
@@ -220,12 +208,12 @@ export default function SearchMemories() {
 
       {/* No Results */}
       {!loading && !error && results.length === 0 && query && (
-        <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
-          <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="card card--pad text-center py-12">
+          <svg className="mx-auto h-12 w-12" style={{ color: 'var(--text-lo)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">No results found</h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          <h3 className="mt-2 text-sm font-medium text-ink-hi">No results found</h3>
+          <p className="mt-1 text-sm text-ink-mid">
             Try adjusting your search query or threshold.
           </p>
         </div>

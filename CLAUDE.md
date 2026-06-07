@@ -273,12 +273,15 @@ Key directories:
   - `export/` — `static.js` (engram-context export)
   - `config/` — Configuration loader
   - `utils/` — `id.js`, `logger.js`, `time.js` (time-filter parser), `format.js`
-- `dashboard/` — React 18 + Vite + Tailwind. Pages: Dashboard, MemoryList, SearchMemories, Agents, Statistics, MemoryHealth, Contradictions, Download, ImportWizard. Agent auto-discovery lives here.
-- `desktop/` — Tauri v2 wrapper (own `package.json`, currently versioned ahead of npm)
+- `dashboard/` — React 18 + Vite + Tailwind. Pages: Dashboard, MemoryList, SearchMemories, Agents, Statistics, MemoryHealth, Contradictions, Download, ImportWizard. Agent auto-discovery lives here. Styled with the "Cortex" design system (`src/design-system.css` tokens + components, sidebar shell in `App.jsx`, single dark theme).
+- `desktop/` — Tauri v2 wrapper (own `package.json`, kept in lockstep with npm at v1.5.3). Cortex tokens in `src/styles/globals.css`.
+- `assets/brand/` — canonical brand sources: `engram-mark.svg` (flat), `engram-icon.svg` (gradient tile), and self-hosted `fonts/`. See `DESIGN_SYSTEM.md`.
 - `test/` — Vitest tests
 - `docs/` — Architecture, API, MCP setup, PM2 deployment guides
 - `examples/` — `api-client.js`, `basic-usage.js`
 - `scripts/build-sidecar.js` — Tauri sidecar compilation helper
+- `scripts/generate-brand.js` — renders the Bloom mark to all icon/favicon/tray rasters + `.icns` (run after editing the brand SVGs)
+- `DESIGN_SYSTEM.md` — the Cortex design system (tokens, mark, fonts, category colors, component classes)
 - `ecosystem.config.cjs` — PM2 process manager config
 
 ## Testing Strategy

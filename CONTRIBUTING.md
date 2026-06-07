@@ -237,6 +237,25 @@ describe('Memory Store', () => {
 - Update API documentation in docs/api.md
 - Keep documentation clear and concise
 
+## Brand & Design System
+
+Engram's visual language ("Cortex") is documented in [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md):
+tokens, the Bloom mark, fonts, category colors, and component classes shared by
+the web dashboard and the desktop app.
+
+The logo/icon rasters are **generated**, not hand-edited. The canonical vector
+sources are `assets/brand/engram-mark.svg` (flat) and `assets/brand/engram-icon.svg`
+(gradient tile). After editing either, regenerate the icon set, tray icons,
+favicons, `.icns`, and README logo with:
+
+```bash
+node scripts/generate-brand.js
+```
+
+Fonts are self-hosted in `assets/brand/fonts/` (mirrored into each app's
+`public/fonts/`) — never add Google Fonts / CDN `<link>`s; Engram must work fully
+offline.
+
 ## Versioning
 
 Engram ships in two parallel artifacts: the npm package (`@hbarefoot/engram`, root `package.json`) and the desktop app (`desktop/package.json`). **Bump them together** — no asymmetric releases. The `dashboard/package.json` version is decoupled because the dashboard is bundled into both artifacts at build time, not separately consumed.

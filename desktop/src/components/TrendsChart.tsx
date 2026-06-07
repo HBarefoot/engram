@@ -1,4 +1,5 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { CHART_TOOLTIP_STYLE, CHART_AXIS_COLOR, CHART_GRID_COLOR } from "../lib/categories";
 
 interface TrendPoint {
   date: string;
@@ -28,19 +29,11 @@ export default function TrendsChart({ data }: TrendsChartProps) {
   return (
     <ResponsiveContainer width="100%" height={240}>
       <LineChart data={formatted}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-        <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#9ca3af" }} interval="preserveStartEnd" />
-        <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} allowDecimals={false} />
-        <Tooltip
-          contentStyle={{
-            backgroundColor: "#1f2937",
-            border: "1px solid #374151",
-            borderRadius: "0.5rem",
-            color: "#f3f4f6",
-            fontSize: "0.75rem",
-          }}
-        />
-        <Line type="monotone" dataKey="created" stroke="#6366f1" strokeWidth={2} dot={false} name="Created" />
+        <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID_COLOR} opacity={0.5} />
+        <XAxis dataKey="label" tick={{ fontSize: 11, fill: CHART_AXIS_COLOR }} interval="preserveStartEnd" />
+        <YAxis tick={{ fontSize: 11, fill: CHART_AXIS_COLOR }} allowDecimals={false} />
+        <Tooltip contentStyle={CHART_TOOLTIP_STYLE} />
+        <Line type="monotone" dataKey="created" stroke="#6d7bff" strokeWidth={2} dot={false} name="Created" />
       </LineChart>
     </ResponsiveContainer>
   );

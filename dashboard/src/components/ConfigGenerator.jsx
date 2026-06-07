@@ -36,29 +36,32 @@ export default function ConfigGenerator({ platform, installationPath, platformOS
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+        <h3 className="text-lg font-medium mb-2" style={{ color: 'var(--text-hi)' }}>
           Configuration for {platformConfig.name}
         </h3>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          Config file location: <code className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded">{platformConfig.configPath}</code>
+        <p className="text-sm" style={{ color: 'var(--text-mid)' }}>
+          Config file location: <code className="mono px-2 py-1 rounded" style={{ background: 'var(--surface-2)', color: 'var(--text-hi)', border: '1px solid var(--border)' }}>{platformConfig.configPath}</code>
         </p>
       </div>
 
       {/* Installation Path Validation */}
-      <div className={`p-4 rounded-lg border ${
-        validationStatus?.valid
-          ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
-          : 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800'
-      }`}>
+      <div
+        className="p-4 rounded-lg border"
+        style={
+          validationStatus?.valid
+            ? { borderColor: 'color-mix(in oklab, var(--success) 35%, transparent)', background: 'color-mix(in oklab, var(--success) 10%, var(--surface-1))' }
+            : { borderColor: 'color-mix(in oklab, var(--warn) 35%, transparent)', background: 'color-mix(in oklab, var(--warn) 10%, var(--surface-1))' }
+        }
+      >
         <div className="flex items-center space-x-2">
           <span className="text-xl">
             {validationStatus?.valid ? '✅' : '⚠️'}
           </span>
           <div className="flex-1">
-            <p className="font-medium text-sm">
+            <p className="font-medium text-sm" style={{ color: 'var(--text-hi)' }}>
               Installation Path: {validationStatus?.valid ? 'Valid' : 'Check Required'}
             </p>
-            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1 break-all">
+            <p className="text-xs mt-1 break-all mono" style={{ color: 'var(--text-mid)' }}>
               {installationPath}
             </p>
           </div>
@@ -68,27 +71,27 @@ export default function ConfigGenerator({ platform, installationPath, platformOS
       {/* Config Preview */}
       <div className="relative">
         <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label className="field-label" style={{ marginBottom: 0 }}>
             Copy this configuration
           </label>
           <button
             onClick={handleCopy}
-            className="px-3 py-1 text-sm font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300"
+            className="btn btn--sm"
           >
             {copied ? '✓ Copied!' : 'Copy to clipboard'}
           </button>
         </div>
-        <pre className="p-4 bg-gray-900 text-gray-100 rounded-lg overflow-x-auto text-sm">
+        <pre className="p-4 rounded-lg overflow-x-auto text-sm mono" style={{ background: 'var(--surface-2)', color: 'var(--text-hi)', border: '1px solid var(--border)' }}>
           <code>{configString}</code>
         </pre>
       </div>
 
       {/* Instructions */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <h4 className="font-semibold text-blue-900 dark:text-blue-200 mb-2">
+      <div className="card card--pad" style={{ borderColor: 'color-mix(in oklab, var(--info) 30%, transparent)', background: 'color-mix(in oklab, var(--info) 8%, var(--surface-1))' }}>
+        <h4 className="font-semibold mb-2" style={{ color: 'var(--info)' }}>
           Setup Instructions
         </h4>
-        <ol className="list-decimal list-inside space-y-2 text-sm text-blue-800 dark:text-blue-300">
+        <ol className="list-decimal list-inside space-y-2 text-sm" style={{ color: 'var(--text-mid)' }}>
           {platformConfig.instructions.map((instruction, index) => (
             <li key={index}>{instruction}</li>
           ))}

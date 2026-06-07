@@ -5,7 +5,7 @@ export default function HealthGauge({ score }) {
   const circumference = 2 * Math.PI * radius;
   const progress = (score / 100) * circumference;
 
-  const color = score >= 80 ? '#22c55e' : score >= 50 ? '#eab308' : '#ef4444';
+  const color = score >= 80 ? 'var(--success)' : score >= 50 ? 'var(--warn)' : 'var(--danger)';
   const label = score >= 80 ? 'Healthy' : score >= 50 ? 'Needs Attention' : 'Unhealthy';
 
   return (
@@ -16,9 +16,8 @@ export default function HealthGauge({ score }) {
           cy={center}
           r={radius}
           fill="none"
-          stroke="currentColor"
+          stroke="var(--surface-3)"
           strokeWidth={stroke}
-          className="text-gray-200 dark:text-gray-700"
         />
         <circle
           cx={center}
@@ -37,8 +36,8 @@ export default function HealthGauge({ score }) {
           x={center}
           y={center - 6}
           textAnchor="middle"
-          className="fill-gray-900 dark:fill-white text-3xl font-bold"
-          style={{ fontSize: '2rem' }}
+          className="font-display font-bold"
+          style={{ fontSize: '2rem', fill: 'var(--text-hi)' }}
         >
           {score}
         </text>
@@ -46,8 +45,7 @@ export default function HealthGauge({ score }) {
           x={center}
           y={center + 18}
           textAnchor="middle"
-          className="fill-gray-500 dark:fill-gray-400"
-          style={{ fontSize: '0.75rem' }}
+          style={{ fontSize: '0.75rem', fill: 'var(--text-mid)' }}
         >
           {label}
         </text>
