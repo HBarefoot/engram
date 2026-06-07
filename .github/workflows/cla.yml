@@ -36,7 +36,11 @@ jobs:
           path-to-document: 'https://github.com/HBarefoot/engram/blob/main/CLA.md'
           branch: 'cla-signatures'
           allowlist: HBarefoot,dependabot[bot]
-          remote-organization-name: HBarefoot
-          remote-repository-name: engram
+          # Signatures live on the `cla-signatures` branch of THIS repo, so the
+          # default GITHUB_TOKEN (with contents:write above) suffices. The
+          # remote-organization-name / remote-repository-name inputs were
+          # removed: they make the action target a *separate* repo and demand a
+          # PERSONAL_ACCESS_TOKEN, which failed every run with "Please add a
+          # personal access token … for writing signatures in a remote repo".
           custom-pr-sign-comment: 'I have read the CLA Document and I hereby sign the CLA'
           custom-allsigned-prcomment: 'All contributors have signed the CLA. ✓'
