@@ -6,6 +6,34 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-06-07
+
+First release carrying the **"Cortex" design system** and **"Bloom" logo** to published
+artifacts — the redesign was merged after v1.5.3 but never shipped. Both the npm Web UI
+and the macOS desktop app now render the new brand.
+
+### Added
+
+- **"Cortex" design system + "Bloom" logo across the web dashboard and desktop app.**
+  New single dark theme (deep blue-black surfaces, indigo `#6d7bff` → cyan `#34e0e0`
+  gradient accents), Space Grotesk display + IBM Plex Sans/Mono type, a sidebar+topbar
+  dashboard shell (replacing the old top-tabs), and centralized category colors. The
+  Bloom mark, icon set, favicons, tray icons, and `.icns` are generated from the two
+  canonical SVGs in `assets/brand/` via `scripts/generate-brand.js`. Fonts are
+  self-hosted (24 woff2) to preserve the zero-network/offline guarantee — no CDN links.
+  See [`DESIGN_SYSTEM.md`](DESIGN_SYSTEM.md). [#29](https://github.com/HBarefoot/engram/pull/29)
+
+### Changed
+
+- **Desktop bundle now also emits a `.dmg` installer** (`bundle.targets` =
+  `["app", "dmg"]`), alongside the raw `.app`. The app remains unsigned by design — clear
+  Gatekeeper after install with `xattr -cr /Applications/Engram.app`.
+
+### Fixed
+
+- **CLA Assistant writes signatures to this repo** instead of a remote, dropping the PAT
+  requirement for the contribution flow. [#30](https://github.com/HBarefoot/engram/pull/30)
+
 ## [1.5.3] - 2026-06-03
 
 This release bundles three independent improvements (PRs #23, #24, #25). Each was reviewed separately; bundling the version bump keeps the npm release history tidier.
