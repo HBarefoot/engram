@@ -27,6 +27,27 @@ Your AI agent now has long-term memory. Two minutes, no setup, no cloud.
 
 ---
 
+## Support Engram
+
+<a id="support-engram"></a>
+
+**Engram is free and MIT-licensed — and always will be.** No paywalls, no tier-locked features, no telemetry. Every feature ships in the open-source package. Sponsorship is purely a way to fund continued development, not to unlock anything.
+
+[![Support Engram](https://polar.sh/embed/seeks-funding-shield.svg?org=barefoot-digital)](https://buy.polar.sh/polar_cl_SJqyRrR9SLdBUQEtdUt0K5j7el8kKVC1eN0wT2S36rH)
+
+If Engram saves you time, you can sponsor it via [Polar](https://buy.polar.sh/polar_cl_SJqyRrR9SLdBUQEtdUt0K5j7el8kKVC1eN0wT2S36rH):
+
+| Tier | Price / month | For |
+|---|---|---|
+| 🌱 **[Supporter](https://buy.polar.sh/polar_cl_SJqyRrR9SLdBUQEtdUt0K5j7el8kKVC1eN0wT2S36rH)** | $5 | Individuals who want the project to keep shipping. |
+| ⚡ **[Power User](https://buy.polar.sh/polar_cl_SJqyRrR9SLdBUQEtdUt0K5j7el8kKVC1eN0wT2S36rH)** | $25 | Heavy users who rely on Engram day to day. |
+| 👥 **[Team](https://buy.polar.sh/polar_cl_SJqyRrR9SLdBUQEtdUt0K5j7el8kKVC1eN0wT2S36rH)** | $100 | Teams standardizing on Engram across projects. |
+| 🏢 **[Enterprise](https://buy.polar.sh/polar_cl_SJqyRrR9SLdBUQEtdUt0K5j7el8kKVC1eN0wT2S36rH)** | $499 | Priority response on issues + dedicated integration help. |
+
+**About Enterprise.** Engram is MIT-licensed, so commercial use is *already* granted — you don't need to buy a license to use it at work. The Enterprise tier buys **priority response** on issues and **dedicated help wiring Engram into your stack**. For organizations whose policy precludes depending on MIT-licensed software, an optional commercial-license override is available on request. (Engram is maintained by a solo developer, so this is best-effort priority response, not a contractual SLA.)
+
+---
+
 ## Why Engram?
 
 Most agent-memory products are services you run alongside your agent — Postgres, Docker, cloud accounts, API keys. Engram embeds *inside* your agent's process: a focused, stable npm package with practical guardrails.
@@ -378,7 +399,7 @@ If Engram is useful to you, here's how to help:
 - ⭐ **Star the repo** — the loudest signal that this is worth continuing.
 - 🐛 **Open an issue** — bug, feature request, or "we use Engram at \<company\> for \<thing\>" stories all welcome.
 - 💬 **Start a [discussion](https://github.com/HBarefoot/engram/discussions)** — design questions, integration ideas, "how would I…" — all good.
-- ❤️ **[Sponsor on GitHub](https://github.com/sponsors/HBarefoot)** — low-pressure way to support continued development. No tier-locked features; sponsorship goes straight to keeping the project shipping.
+- 💜 **[Support Engram](#support-engram)** — sponsor via Polar to fund continued development. No tier-locked features; sponsorship goes straight to keeping the project shipping.
 
 ---
 
