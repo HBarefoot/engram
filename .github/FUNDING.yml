@@ -1,12 +1,15 @@
 # Engram funding configuration.
 #
-# The Sponsor button only appears once the maintainer is enrolled in
-# GitHub Sponsors. Until enrollment is approved this entry is silent —
-# no errors, no broken UI. See:
+# The Sponsor button routes to Engram's Polar checkout, which hosts the
+# sponsorship tiers (Supporter / Power User / Team / Enterprise).
+#
+# Note: there is intentionally NO `github:` entry — the maintainer is not
+# enrolled in GitHub Sponsors, so a `github:` line would render a dead
+# Sponsor button. Re-add it only once a GitHub Sponsors listing is live.
 #   https://docs.github.com/en/sponsors/getting-started-with-github-sponsors
 
-github: HBarefoot
+custom: ['https://buy.polar.sh/polar_cl_SJqyRrR9SLdBUQEtdUt0K5j7el8kKVC1eN0wT2S36rH']
+# github:
 # ko_fi:
 # buy_me_a_coffee:
 # open_collective:
-# custom: ['https://...']
