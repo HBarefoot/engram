@@ -1,0 +1,65 @@
+name: 💬 Feedback
+description: Tell us what's working, what isn't, and what's missing
+labels: ["feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for using Engram! This isn't a bug report — it's an open invitation to tell us
+        how Engram fits (or doesn't fit) into your workflow. Nothing here is required; share
+        whatever's useful. For open-ended conversation, [Discussions](https://github.com/HBarefoot/engram/discussions)
+        is also a great home.
+
+  - type: textarea
+    id: building
+    attributes:
+      label: What are you building?
+      description: A sentence or two about your agent / project and how Engram fits in.
+      placeholder: e.g. "A Claude Code setup that remembers our team's coding conventions across sessions."
+    validations:
+      required: false
+
+  - type: dropdown
+    id: integration
+    attributes:
+      label: How are you using Engram?
+      multiple: true
+      options:
+        - Claude Code
+        - Claude Desktop
+        - Cursor
+        - Windsurf
+        - Cline
+        - REST API
+        - CLI
+        - Desktop app
+        - Other
+    validations:
+      required: false
+
+  - type: textarea
+    id: working
+    attributes:
+      label: What's working well?
+      description: What does Engram do that's genuinely useful to you?
+      placeholder: What should we keep / not break?
+    validations:
+      required: false
+
+  - type: textarea
+    id: missing
+    attributes:
+      label: What's missing or frustrating?
+      description: Rough edges, papercuts, or capabilities you wish existed.
+      placeholder: What would make Engram noticeably better for you?
+    validations:
+      required: false
+
+  - type: input
+    id: contact
+    attributes:
+      label: Contact (optional)
+      description: If you're open to a quick follow-up, drop a handle or email. Totally optional.
+      placeholder: "@yourhandle / you@example.com"
+    validations:
+      required: false
