@@ -6,6 +6,19 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+### Fixed
+
+- **MCP stdio server no longer crashes at startup when `sharp` can't load.** `sharp` is a
+  transitive native dependency of `@xenova/transformers` (the embedding library), and a top-level
+  `import` in `src/embed/index.js` dragged it onto the MCP boot path (`bin/engram.js` → `mcp.js` →
+  `recall`/`context` → `embed`). On platforms where sharp's prebuilt binary won't resolve (clean
+  Debian/`trixie-slim`, ARM macOS, Windows, Alpine/musl) the process died with
+  *"Cannot find module sharp-linux-x64.node"* before completing the MCP handshake — breaking
+  `npx`/install for real users and the Glama listing alike. `@xenova/transformers` is now lazy-loaded
+  only when an embedding is actually generated, so the stdio server boots with no image libs on the
+  load path; if the embedding stack later fails to load, recall falls back to FTS-only and remember
+  stores without an embedding (no crash). Regression-tested in `test/server/mcp-boot-no-sharp.test.js`.
+
 ## [1.6.0] - 2026-06-07
 
 First release carrying the **"Cortex" design system** and **"Bloom" logo** to published
