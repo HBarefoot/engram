@@ -1,0 +1,16 @@
+.git
+node_modules
+dashboard
+desktop
+stats
+docs
+examples
+test
+assets
+*.png
+*.md
+package-lock.json
+!package-lock.json
+.github
+scripts
+ecosystem.config.cjs

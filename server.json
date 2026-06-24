@@ -1,0 +1,33 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.hbarefoot/engram",
+  "description": "Local-first persistent memory for AI agents — SQLite + local embeddings, MCP-native, no cloud.",
+  "repository": {
+    "url": "https://github.com/HBarefoot/engram",
+    "source": "github"
+  },
+  "websiteUrl": "https://next.henrybarefoot.com/engram",
+  "version": "1.6.2",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@hbarefoot/engram",
+      "version": "1.6.2",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "start",
+          "valueHint": "command"
+        },
+        {
+          "type": "named",
+          "name": "--mcp-only"
+        }
+      ]
+    }
+  ]
+}

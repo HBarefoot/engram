@@ -6,6 +6,20 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-06-23
+
+### Added
+
+- **MCP Registry + Glama launch.** Added `server.json` (the MCP Registry manifest, server name
+  `io.github.hbarefoot/engram`), the `mcpName` field in `package.json` (registry npm-ownership
+  verification), and an MCP-only stdio `Dockerfile` + `.dockerignore` so the registry and Glama can
+  introspect the server via `tools/list`. No runtime code change — packaging/metadata only. Engram is
+  now publishable to the [MCP Registry](https://registry.modelcontextprotocol.io) and installable by
+  Glama (which boots the stdio server in a clean Linux image — green now that `sharp` is off the boot
+  path, see 1.6.1).
+
+## [1.6.1] - 2026-06-23
+
 ### Fixed
 
 - **MCP stdio server no longer crashes at startup when `sharp` can't load.** `sharp` is a
