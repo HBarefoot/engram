@@ -6,6 +6,15 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+## [1.6.3] - 2026-06-24
+
+### Fixed
+
+- **Corrected the MCP server namespace casing to `io.github.HBarefoot/engram`** (was lowercased in
+  1.6.2). The MCP Registry derives the publish namespace from the canonical GitHub username and matches
+  `mcpName` case-sensitively, so the lowercase `mcpName` in 1.6.2 was rejected on publish. `server.json`
+  and `package.json` `mcpName` now use the canonical casing. Metadata only — no runtime change.
+
 ## [1.6.2] - 2026-06-23
 
 ### Added

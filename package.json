@@ -1,7 +1,7 @@
 {
   "name": "@hbarefoot/engram",
-  "version": "1.6.2",
-  "mcpName": "io.github.hbarefoot/engram",
+  "version": "1.6.3",
+  "mcpName": "io.github.HBarefoot/engram",
   "description": "Persistent memory for AI agents. SQLite for agent state.",
   "type": "module",
   "main": "src/index.js",
