@@ -10,6 +10,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 [![MCP](https://img.shields.io/badge/MCP-compatible-blue)](https://modelcontextprotocol.io)
+[![engram MCP server](https://glama.ai/mcp/servers/HBarefoot/engram/badges/score.svg)](https://glama.ai/mcp/servers/HBarefoot/engram)
 
 ```bash
 npm install -g @hbarefoot/engram
@@ -406,6 +407,18 @@ If Engram is useful to you, here's how to help:
 ## Feedback
 
 Using Engram? Tell me what's working and what isn't — open a [Discussion](https://github.com/HBarefoot/engram/discussions), [file feedback](https://github.com/HBarefoot/engram/issues/new?template=feedback.yml), or run `engram feedback` from the CLI. **No telemetry, ever** — Engram never phones home, so the only feedback I get is what you choose to send.
+
+---
+
+## Find Engram on Glama
+
+Engram is listed in the [Glama MCP directory](https://glama.ai/mcp/servers/HBarefoot/engram) and the [official MCP Registry](https://registry.modelcontextprotocol.io) as `io.github.HBarefoot/engram`.
+
+<p align="center">
+  <a href="https://glama.ai/mcp/servers/HBarefoot/engram">
+    <img src="https://glama.ai/mcp/servers/HBarefoot/engram/badges/card.svg" alt="engram MCP server" />
+  </a>
+</p>
 
 ---
 
