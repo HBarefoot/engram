@@ -6,6 +6,15 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+### Fixed
+
+- **A bare `node bin/engram.js` (no subcommand) now boots the MCP stdio server when stdin is not a
+  TTY.** MCP proxies/registries (Glama's introspection, `mcp-proxy`) spawn the entry point with no args
+  over a pipe and expect a JSON-RPC server; Commander's default was to print help and exit, which they
+  read as "connection closed". Now a non-interactive bare invocation behaves as `start --mcp-only`,
+  while an interactive `engram` in a terminal still shows help and explicit subcommands are untouched.
+  (`src/utils/mcp-default.js`, tested in `test/cli/mcp-default.test.js`.)
+
 ## [1.6.3] - 2026-06-24
 
 ### Fixed
