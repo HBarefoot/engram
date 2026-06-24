@@ -1,4 +1,3 @@
-import { pipeline } from '@xenova/transformers';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -140,6 +139,17 @@ async function _doInitializePipeline(modelsPath) {
     process.env.TRANSFORMERS_CACHE = modelsPath;
 
     logger.info('Loading embedding model (this may take a moment on first run)...');
+
+    // Lazy-load @xenova/transformers here, NOT at module top level.
+    // transformers eagerly evaluates its transitive `sharp` native binary at
+    // module-init; a static top-level import would drag sharp onto the MCP
+    // stdio-server boot path (bin/engram.js → mcp.js → recall/context → embed)
+    // and crash startup on platforms where sharp's prebuilt binary can't load
+    // (Glama's debian:trixie-slim, ARM Mac, Windows, Alpine/musl). Loading it
+    // only when an embedding is actually generated keeps the boot path
+    // image-lib-free; a failure here is caught below and callers degrade to
+    // FTS-only recall / storing without an embedding.
+    const { pipeline } = await import('@xenova/transformers');
 
     // Create pipeline
     cachedPipeline = await pipeline(
