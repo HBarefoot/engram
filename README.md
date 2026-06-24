@@ -403,6 +403,12 @@ If Engram is useful to you, here's how to help:
 
 ---
 
+## Feedback
+
+Using Engram? Tell me what's working and what isn't — open a [Discussion](https://github.com/HBarefoot/engram/discussions), [file feedback](https://github.com/HBarefoot/engram/issues/new?template=feedback.yml), or run `engram feedback` from the CLI. **No telemetry, ever** — Engram never phones home, so the only feedback I get is what you choose to send.
+
+---
+
 ## License
 
 MIT © 2026 [HBarefoot](https://github.com/HBarefoot)

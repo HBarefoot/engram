@@ -69,6 +69,16 @@ program
 
       f.printHeader(version);
 
+      // One-time, opt-in feedback nudge — TTY only, never in MCP/CI, never blocks.
+      try {
+        const { maybeShowNudge } = await import('../src/utils/nudge.js');
+        const nudgeDb = initDatabase(getDatabasePath(config));
+        maybeShowNudge(nudgeDb);
+        nudgeDb.close();
+      } catch {
+        // A nudge must never break startup.
+      }
+
       const { port: actualPort } = await startRESTServer(config, requestedPort);
 
       if (actualPort !== requestedPort) {
@@ -619,6 +629,43 @@ program
       const f = await loadFormat();
       f.error(`Import error: ${error.message}`);
       process.exit(1);
+    }
+  });
+
+// Feedback command — surface the (voluntary) feedback channels.
+// Distinct from the engram_feedback MCP tool, which votes on a memory's
+// helpfulness; this just shows where to send project feedback.
+program
+  .command('feedback')
+  .description('Show how to send feedback (Engram has no telemetry — feedback is always voluntary)')
+  .option('--open', 'Open the feedback page in your default browser')
+  .action(async (options) => {
+    const f = await loadFormat();
+    const discussionsUrl = 'https://github.com/HBarefoot/engram/discussions';
+    const issueUrl = 'https://github.com/HBarefoot/engram/issues/new?template=feedback.yml';
+
+    console.log('');
+    f.info('Engram has no telemetry — feedback is always voluntary. Two ways to send it:');
+    console.log(`  💬 Discussions:  ${discussionsUrl}`);
+    console.log(`  📝 Feedback form: ${issueUrl}`);
+    console.log('');
+
+    if (options.open) {
+      try {
+        const { spawn } = await import('child_process');
+        const opener =
+          process.platform === 'darwin' ? 'open' :
+          process.platform === 'win32' ? 'start' : 'xdg-open';
+        const child = spawn(opener, [discussionsUrl], {
+          stdio: 'ignore',
+          detached: true,
+          shell: process.platform === 'win32'
+        });
+        child.on('error', () => {}); // fall back silently to the printed URL
+        child.unref();
+      } catch {
+        // The URLs are already printed above — opening is best-effort.
+      }
     }
   });
 
