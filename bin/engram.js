@@ -10,6 +10,7 @@ import { consolidate, getConflicts } from '../src/memory/consolidate.js';
 import { validateContent } from '../src/extract/secrets.js';
 import { extractMemory } from '../src/extract/rules.js';
 import { exportToStatic } from '../src/export/static.js';
+import { shouldDefaultToMcp } from '../src/utils/mcp-default.js';
 import * as logger from '../src/utils/logger.js';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -668,5 +669,12 @@ program
       }
     }
   });
+
+// MCP-first default: when an MCP client/proxy/registry spawns `node bin/engram.js`
+// with no subcommand over a piped (non-TTY) stdin, boot the stdio server instead
+// of printing help and exiting. Interactive `engram` in a terminal still shows help.
+if (shouldDefaultToMcp(process.argv.slice(2), process.stdin.isTTY)) {
+  process.argv.push('start', '--mcp-only');
+}
 
 program.parse(process.argv);
