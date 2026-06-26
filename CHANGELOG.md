@@ -14,9 +14,13 @@ Versions marked *(unpublished)* exist in git history but were never released to 
   starts on 3838 but falls back to 3839–3842 when that port is busy (`findAvailablePort` in
   `src/server/rest.js`), and the Tauri shell never reported the chosen port back to the UI — so every
   tab showed "Load failed" and the status read "Disconnected" whenever the fallback fired. The desktop
-  frontend now probes the 3838–3842 range (honoring an explicit `restPort` preference first) on startup
-  and re-discovers on any failed health poll. (`desktop/src/lib/api.ts`,
-  `desktop/src/components/Sidebar.tsx`.)
+  frontend now probes the 3838–3842 range on startup and re-discovers on any failed health poll.
+  (`desktop/src/lib/api.ts`, `desktop/src/components/Sidebar.tsx`.)
+- **Removed the editable "REST API Port" field from desktop Settings.** The bundled sidecar always
+  launches on 3838 (ignoring this preference), so a stale/custom value here pointed the UI at a dead
+  port and produced the same "Load failed" on every tab — with no indication why. The field is now a
+  read-only display of the auto-detected port; the app finds the live server on its own.
+  (`desktop/src/pages/Preferences.tsx`, `desktop/src/lib/api.ts`.)
 - **A bare `node bin/engram.js` (no subcommand) now boots the MCP stdio server when stdin is not a
   TTY.** MCP proxies/registries (Glama's introspection, `mcp-proxy`) spawn the entry point with no args
   over a pipe and expect a JSON-RPC server; Commander's default was to print help and exit, which they
