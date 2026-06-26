@@ -6,14 +6,31 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+## [1.6.4] - 2026-06-26
+
 ### Fixed
 
+- **Desktop app now discovers the server's actual port instead of assuming 3838.** The bundled sidecar
+  starts on 3838 but falls back to 3839–3842 when that port is busy (`findAvailablePort` in
+  `src/server/rest.js`), and the Tauri shell never reported the chosen port back to the UI — so every
+  tab showed "Load failed" and the status read "Disconnected" whenever the fallback fired. The desktop
+  frontend now probes the 3838–3842 range (honoring an explicit `restPort` preference first) on startup
+  and re-discovers on any failed health poll. (`desktop/src/lib/api.ts`,
+  `desktop/src/components/Sidebar.tsx`.)
 - **A bare `node bin/engram.js` (no subcommand) now boots the MCP stdio server when stdin is not a
   TTY.** MCP proxies/registries (Glama's introspection, `mcp-proxy`) spawn the entry point with no args
   over a pipe and expect a JSON-RPC server; Commander's default was to print help and exit, which they
   read as "connection closed". Now a non-interactive bare invocation behaves as `start --mcp-only`,
   while an interactive `engram` in a terminal still shows help and explicit subcommands are untouched.
   (`src/utils/mcp-default.js`, tested in `test/cli/mcp-default.test.js`.)
+
+### Changed
+
+- **Desktop release artifacts now ship with every GitHub Release.** `desktop-build.yml` previously
+  triggered only on a separate `desktop-v*` tag, which was easy to forget — v1.6.1, v1.6.2, and v1.6.3
+  shipped no macOS `.dmg` as a result. It now triggers on `release: published` (the same event as the
+  npm `publish.yml`) and attaches both the `.dmg` and the zipped `.app` to the triggering release, so a
+  single `vX.Y.Z` release ships npm and desktop together.
 
 ## [1.6.3] - 2026-06-24
 

@@ -1,14 +1,19 @@
 name: Build Desktop App
 
+# Builds the macOS desktop app and attaches the .dmg + zipped .app to the
+# GitHub Release that triggered it — so every `vX.Y.Z` release ships both the
+# npm package (publish.yml) and the desktop artifacts. Also runnable manually
+# via workflow_dispatch (build-only; no release upload).
 on:
-  push:
-    tags:
-      - "desktop-v*"
+  release:
+    types: [published]
   workflow_dispatch:
 
 jobs:
   build-macos:
     runs-on: macos-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -40,61 +45,34 @@ jobs:
       - name: Build Tauri app (Apple Silicon)
         run: cd desktop && npm run tauri build -- --target aarch64-apple-darwin
 
-      - name: Extract version from tag
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Resolve version
         id: version
-        run: echo "version=${GITHUB_REF#refs/tags/desktop-v}" >> "$GITHUB_OUTPUT"
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            v="${{ github.event.release.tag_name }}"
+          else
+            v="$(node -p "require('./desktop/package.json').version")"
+          fi
+          echo "version=${v#v}" >> "$GITHUB_OUTPUT"
 
       - name: Zip the .app bundle (preserving permissions)
-        if: startsWith(github.ref, 'refs/tags/')
         run: |
           cd desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos
           zip -r -y "Engram_${{ steps.version.outputs.version }}_arm64.app.zip" Engram.app
 
-      - name: Upload zip artifact
+      - name: Upload build artifacts (always)
         uses: actions/upload-artifact@v4
         with:
           name: Engram-macos
           path: |
             desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.zip
+            desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
 
-  release:
-    needs: build-macos
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    permissions:
-      contents: write
-    steps:
-      - name: Extract version from tag
-        id: version
-        run: echo "version=${GITHUB_REF#refs/tags/desktop-v}" >> "$GITHUB_OUTPUT"
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-
-      - name: Create Release
+      - name: Attach assets to the triggering release
+        if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          name: Engram Desktop v${{ steps.version.outputs.version }}
+          tag_name: ${{ github.event.release.tag_name }}
           files: |
-            Engram-macos/*.app.zip
-          draft: false
-          generate_release_notes: true
-          body: |
-            ## Installation (macOS — Apple Silicon)
-
-            Requires a Mac with Apple Silicon (M1/M2/M3/M4).
-
-            ### Download & Install
-            1. Download `Engram_${{ steps.version.outputs.version }}_arm64.app.zip` below
-            2. Unzip and move **Engram.app** to your Applications folder
-            3. **First launch:** Right-click the app → **Open** → Click **Open** in the dialog
-               _(This is only needed once — macOS remembers your choice)_
-
-            ### Why the extra step?
-            This app is not yet signed with an Apple Developer certificate. macOS Gatekeeper blocks unsigned apps by default. Right-clicking and choosing "Open" tells macOS you trust this app. You only need to do this once.
-
-            **Alternative (Terminal):**
-            ```bash
-            xattr -cr /Applications/Engram.app
-            ```
+            desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.zip
+            desktop/src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg

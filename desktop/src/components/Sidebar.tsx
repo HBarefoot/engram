@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { getHealthUrl, api } from "../lib/api";
+import { getHealthUrl, discoverPort, api } from "../lib/api";
 
 interface NavItem {
   path: string;
@@ -103,10 +103,16 @@ export default function Sidebar() {
   const checkHealth = useCallback(async () => {
     try {
       const res = await fetch(getHealthUrl());
-      setHealthy(res.ok);
+      if (res.ok) {
+        setHealthy(true);
+        return;
+      }
     } catch {
-      setHealthy(false);
+      // fall through to re-discovery below
     }
+    // Health check failed — the sidecar may have bound to a fallback port
+    // (3838 busy → 3839–3842). Re-discover before declaring disconnected.
+    setHealthy(await discoverPort());
   }, []);
 
   const fetchContradictionCount = useCallback(async () => {

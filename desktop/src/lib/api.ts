@@ -2,17 +2,60 @@ import { invoke } from "@tauri-apps/api/core";
 
 const DEFAULT_PORT = 3838;
 
+// The sidecar is launched on 3838 but its server falls back to the next free
+// port if 3838 is busy (findAvailablePort tries 3838..3842 in src/server/rest.js).
+// The Tauri shell does not report the chosen port back to the UI, so we probe.
+const PORT_RANGE = [3838, 3839, 3840, 3841, 3842];
+
 let port = DEFAULT_PORT;
 
-/** Initialize the API port from saved preferences. Call once at app startup. */
-export async function initApiPort(): Promise<void> {
+/** True if an Engram server answers /health on the given port within ~1.5s. */
+async function probePort(candidate: number): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 1500);
+  try {
+    const res = await fetch(`http://localhost:${candidate}/health`, { signal: controller.signal });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Find the port the local Engram sidecar is actually listening on and remember it.
+ * An explicit `restPort` preference is tried first; then the 3838–3842 fallback
+ * range. Returns true if a live server was found. Safe to call repeatedly.
+ */
+export async function discoverPort(): Promise<boolean> {
+  const candidates: number[] = [];
+
+  // Explicit user override (Preferences → REST port) takes priority.
   try {
     const prefs = await invoke<{ restPort: string }>("get_preferences");
     const parsed = parseInt(prefs.restPort, 10);
-    if (parsed > 0) port = parsed;
+    if (parsed > 0) candidates.push(parsed);
   } catch {
-    // Tauri not available (e.g. dev mode in browser) — use default
+    // Tauri not available (e.g. dev mode in a browser) — fall through to defaults.
   }
+
+  for (const p of PORT_RANGE) {
+    if (!candidates.includes(p)) candidates.push(p);
+  }
+
+  for (const candidate of candidates) {
+    if (await probePort(candidate)) {
+      port = candidate;
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Initialize the API port. Call once at app startup. */
+export async function initApiPort(): Promise<void> {
+  await discoverPort();
 }
 
 export function getApiBase(): string {
