@@ -6,6 +6,8 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+## [1.6.5] - 2026-06-26
+
 ### Added
 
 - **Live menu-bar tray status.** The tray dropdown's "Status" and "Memories" items (and the tray
