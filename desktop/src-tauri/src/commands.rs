@@ -30,11 +30,11 @@ pub struct DetectedAgent {
 }
 
 #[derive(Debug, Deserialize)]
-struct EngramStatusResponse {
-    status: Option<String>,
-    memories: Option<u64>,
-    uptime: Option<u64>,
-    version: Option<String>,
+pub(crate) struct EngramStatusResponse {
+    pub(crate) status: Option<String>,
+    pub(crate) memories: Option<u64>,
+    pub(crate) uptime: Option<u64>,
+    pub(crate) version: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

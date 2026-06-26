@@ -1,9 +1,20 @@
 use tauri::{
     image::Image,
-    menu::{MenuBuilder, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder},
+    menu::{MenuBuilder, MenuItem, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder},
     tray::TrayIconBuilder,
     AppHandle, Emitter, Manager,
 };
+
+use crate::sidecar::SidecarStatus;
+
+const TRAY_ID: &str = "engram-tray";
+
+/// Handles to the live tray menu items, stored in app state so the health-check
+/// loop can refresh them with the current status + memory count.
+pub struct TrayHandles {
+    pub status: MenuItem<tauri::Wry>,
+    pub memory_count: MenuItem<tauri::Wry>,
+}
 
 pub fn create_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     // Build the tray menu
@@ -95,7 +106,7 @@ pub fn create_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         Image::new_owned(vec![0, 0, 0, 255], 1, 1)
     });
 
-    let _tray = TrayIconBuilder::new()
+    let _tray = TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon)
         .icon_as_template(false)
         .menu(&menu)
@@ -123,7 +134,44 @@ pub fn create_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         })
         .build(app)?;
 
+    // Keep handles to the live items so the health loop can refresh them.
+    app.manage(TrayHandles {
+        status: status_item,
+        memory_count: memory_count_item,
+    });
+
     Ok(())
+}
+
+/// Refresh the live tray menu items + tooltip with the current sidecar status
+/// and memory count. Safe to call from any thread (marshals to the main thread,
+/// which macOS requires for menu/tray mutations).
+pub fn update_tray(app: &AppHandle, status: &SidecarStatus, memory_count: Option<u64>) {
+    let status_text = match status {
+        SidecarStatus::Running => "Status: Running",
+        SidecarStatus::Starting => "Status: Starting",
+        SidecarStatus::Stopped => "Status: Stopped",
+        SidecarStatus::Crashed => "Status: Crashed",
+    };
+    let memory_text = match memory_count {
+        Some(n) => format!("Memories: {}", n),
+        None => "Memories: —".to_string(),
+    };
+    let tooltip = match memory_count {
+        Some(n) => format!("Engram — {} memories", n),
+        None => "Engram - AI Memory".to_string(),
+    };
+
+    let app = app.clone();
+    let _ = app.clone().run_on_main_thread(move || {
+        if let Some(handles) = app.try_state::<TrayHandles>() {
+            let _ = handles.status.set_text(status_text);
+            let _ = handles.memory_count.set_text(&memory_text);
+        }
+        if let Some(tray) = app.tray_by_id(TRAY_ID) {
+            let _ = tray.set_tooltip(Some(&tooltip));
+        }
+    });
 }
 
 fn handle_menu_event(app: &AppHandle, event_id: &str) {

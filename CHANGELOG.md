@@ -6,6 +6,14 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+### Added
+
+- **Live menu-bar tray status.** The tray dropdown's "Status" and "Memories" items (and the tray
+  tooltip) now update with the real sidecar state and memory count on the existing 30s health-check
+  loop, instead of showing a hardcoded "Status: Running" / "Memories: ...". Reflects
+  Running/Starting/Stopped/Crashed and the live count. (`desktop/src-tauri/src/tray.rs`,
+  `desktop/src-tauri/src/sidecar.rs`.)
+
 ### Fixed
 
 - **Desktop onboarding "seed" step now actually imports.** The wizard's claude-files / git-config /
