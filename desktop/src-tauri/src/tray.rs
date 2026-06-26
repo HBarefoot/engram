@@ -189,12 +189,3 @@ fn is_agent_connected(config_path: &std::path::Path) -> bool {
         .and_then(|config| config.get("mcpServers")?.as_object()?.get("engram").cloned())
         .is_some()
 }
-
-/// Update the tray status by emitting an event to the frontend.
-/// The tray menu itself is static; dynamic status is shown in the dashboard.
-pub fn update_tray_status(app: &AppHandle, memory_count: u64, is_running: bool) {
-    let _ = app.emit("tray-status-update", serde_json::json!({
-        "memory_count": memory_count,
-        "is_running": is_running,
-    }));
-}

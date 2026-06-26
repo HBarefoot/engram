@@ -37,14 +37,6 @@ struct EngramStatusResponse {
     version: Option<String>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SeedOptions {
-    pub claude_files: bool,
-    pub git_config: bool,
-    pub package_json: bool,
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DesktopPreferences {
@@ -172,7 +164,6 @@ pub async fn configure_agent(agent_name: String) -> Result<String, String> {
 #[tauri::command]
 pub async fn complete_onboarding(
     agents: Vec<String>,
-    _seed_options: SeedOptions,
 ) -> Result<String, String> {
     let mut results = Vec::new();
 

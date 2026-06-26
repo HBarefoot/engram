@@ -6,6 +6,16 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+### Fixed
+
+- **Desktop onboarding "seed" step now actually imports.** The wizard's claude-files / git-config /
+  package.json checkboxes were collected but ignored by the backend, so they did nothing. Completing
+  onboarding now runs the selected sources through the existing REST import flow
+  (`/api/import/scan` + `/api/import/commit`) and seeds the chosen memories. Also removed the dead
+  `SeedOptions` Rust struct and the unused `update_tray_status` function (clears the two build-time
+  dead-code warnings). (`desktop/src/pages/Onboarding.tsx`, `desktop/src-tauri/src/commands.rs`,
+  `desktop/src-tauri/src/tray.rs`.)
+
 ## [1.6.4] - 2026-06-26
 
 ### Fixed
