@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
-import { getApiBase } from "../lib/api";
+import { getApiBase, getPort } from "../lib/api";
 
 type Tab = "general" | "agents" | "shortcuts" | "storage" | "advanced";
 
@@ -502,18 +502,18 @@ export default function Preferences() {
               <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-700 space-y-3">
                 <div>
                   <label className="text-sm font-medium">REST API Port</label>
-                  <input
-                    type="text"
-                    value={prefs.restPort}
-                    onChange={(e) => updatePref("restPort", e.target.value)}
-                    className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  <div
+                    className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm"
                     style={{ color: "rgba(var(--text-primary), 1)" }}
-                  />
+                  >
+                    {getPort()}
+                  </div>
                   <p
                     className="text-xs mt-1"
                     style={{ color: "rgba(var(--text-secondary), 1)" }}
                   >
-                    Requires restart to take effect
+                    Auto-detected. Engram starts on 3838 and uses the next free port (up to 3842)
+                    if it's busy — the app connects to it automatically.
                   </p>
                 </div>
               </div>

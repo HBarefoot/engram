@@ -1,5 +1,3 @@
-import { invoke } from "@tauri-apps/api/core";
-
 const DEFAULT_PORT = 3838;
 
 // The sidecar is launched on 3838 but its server falls back to the next free
@@ -25,32 +23,24 @@ async function probePort(candidate: number): Promise<boolean> {
 
 /**
  * Find the port the local Engram sidecar is actually listening on and remember it.
- * An explicit `restPort` preference is tried first; then the 3838–3842 fallback
- * range. Returns true if a live server was found. Safe to call repeatedly.
+ * The bundled sidecar always launches on 3838 and the server only ever falls back
+ * within 3838–3842, so we probe that range — there is no user-configurable port to
+ * honor (the desktop sidecar ignores it). Returns true if a live server was found.
+ * Safe to call repeatedly.
  */
 export async function discoverPort(): Promise<boolean> {
-  const candidates: number[] = [];
-
-  // Explicit user override (Preferences → REST port) takes priority.
-  try {
-    const prefs = await invoke<{ restPort: string }>("get_preferences");
-    const parsed = parseInt(prefs.restPort, 10);
-    if (parsed > 0) candidates.push(parsed);
-  } catch {
-    // Tauri not available (e.g. dev mode in a browser) — fall through to defaults.
-  }
-
-  for (const p of PORT_RANGE) {
-    if (!candidates.includes(p)) candidates.push(p);
-  }
-
-  for (const candidate of candidates) {
+  for (const candidate of PORT_RANGE) {
     if (await probePort(candidate)) {
       port = candidate;
       return true;
     }
   }
   return false;
+}
+
+/** The port the UI is currently talking to (auto-detected, read-only). */
+export function getPort(): number {
+  return port;
 }
 
 /** Initialize the API port. Call once at app startup. */
