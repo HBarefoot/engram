@@ -6,6 +6,8 @@ use tauri_plugin_shell::ShellExt;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tokio::time::sleep;
 
+use crate::commands::EngramStatusResponse;
+
 const MAX_RESTART_ATTEMPTS: u32 = 3;
 const HEALTH_CHECK_INTERVAL: Duration = Duration::from_secs(30);
 const STARTUP_GRACE_PERIOD: Duration = Duration::from_secs(5);
@@ -414,6 +416,22 @@ pub async fn health_check(port: u16) -> bool {
     }
 }
 
+/// Fetch and parse `/api/status`. Returns `None` when the server is unreachable
+/// or unhealthy — used by the health loop to get both liveness and memory count.
+async fn fetch_status(port: u16) -> Option<EngramStatusResponse> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .ok()?;
+
+    let url = format!("http://localhost:{}/api/status", port);
+    let resp = client.get(&url).send().await.ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    resp.json::<EngramStatusResponse>().await.ok()
+}
+
 /// Set up the restart listener and health check loop.
 /// Call this once during app setup.
 pub fn setup_sidecar_lifecycle(app: &AppHandle) {
@@ -426,24 +444,35 @@ pub fn setup_sidecar_lifecycle(app: &AppHandle) {
         }
     });
 
-    // Spawn periodic health check
+    // Spawn periodic health check + live tray refresh
     let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        sleep(Duration::from_secs(10)).await;
+        // Short initial delay so the sidecar has a chance to bind before the
+        // first check (kept below HEALTH_CHECK_INTERVAL so the tray updates early).
+        sleep(Duration::from_secs(5)).await;
 
         loop {
-            sleep(HEALTH_CHECK_INTERVAL).await;
-
             let state = app_handle.state::<SidecarState>();
-            let status = state.status.lock().await.clone();
-
+            let mut status = state.status.lock().await.clone();
             let port = *state.port.lock().await;
-            if matches!(status, SidecarStatus::Running) && !health_check(port).await {
-                eprintln!("[engram] Health check failed, requesting restart");
-                *state.status.lock().await = SidecarStatus::Crashed;
-                *state.child.lock().await = None;
-                let _ = app_handle.emit("sidecar-restart-needed", ());
+
+            let mut memory_count: Option<u64> = None;
+            if matches!(status, SidecarStatus::Running) {
+                match fetch_status(port).await {
+                    Some(s) => memory_count = s.memories,
+                    None => {
+                        eprintln!("[engram] Health check failed, requesting restart");
+                        *state.status.lock().await = SidecarStatus::Crashed;
+                        *state.child.lock().await = None;
+                        let _ = app_handle.emit("sidecar-restart-needed", ());
+                        status = SidecarStatus::Crashed;
+                    }
+                }
             }
+
+            crate::tray::update_tray(&app_handle, &status, memory_count);
+
+            sleep(HEALTH_CHECK_INTERVAL).await;
         }
     });
 }
