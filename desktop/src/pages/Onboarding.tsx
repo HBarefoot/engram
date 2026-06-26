@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
+import { api } from "../lib/api";
 
 interface DetectedAgent {
   id: string;
@@ -70,14 +71,34 @@ export default function Onboarding() {
   }
 
   async function handleComplete() {
+    setLoading(true);
     try {
       await invoke("complete_onboarding", {
         agents: Array.from(selectedAgents),
-        seedOptions,
       });
     } catch {
       // Continue even if Tauri invoke fails
     }
+
+    // Seed initial memories from the sources the user opted into. Maps the
+    // onboarding checkboxes to the REST import source IDs (src/import/index.js).
+    const sources = [
+      seedOptions.claudeFiles && "claude",
+      seedOptions.gitConfig && "git",
+      seedOptions.packageJson && "package",
+    ].filter(Boolean) as string[];
+
+    if (sources.length > 0) {
+      try {
+        const { memories } = await api.scanImportSources(sources);
+        if (memories.length > 0) {
+          await api.commitImport(memories);
+        }
+      } catch {
+        // Best-effort — never trap the user on onboarding if seeding fails.
+      }
+    }
+
     navigate("/");
   }
 
