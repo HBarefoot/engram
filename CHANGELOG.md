@@ -6,6 +6,17 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+## [1.6.6] - 2026-06-27
+
+### Changed
+
+- **Enriched MCP tool definitions for clarity and tool-selection reliability.** Rewrote the
+  descriptions and parameter docs for all six tools (`engram_remember/recall/forget/feedback/context/status`)
+  to document return shapes, edge cases (dedup outcomes, FTS fallback, empty results), and
+  when-to-use guidance, and added `minimum`/`maximum` annotations on numeric params. No behavioral
+  or schema change — parameter names, types, enums, defaults, and `required` arrays are unchanged.
+  Improves Glama's Tool Definition Quality Score and helps agents pick the right tool. (`src/server/mcp.js`, PR #44.)
+
 ## [1.6.5] - 2026-06-26
 
 ### Added
