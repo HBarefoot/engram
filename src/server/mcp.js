@@ -59,7 +59,7 @@ export class EngramMCPServer {
         tools: [
           {
             name: 'engram_remember',
-            description: 'Store a memory/fact/preference/pattern that should be remembered across sessions. Use this when you learn something important about the user, their project, their preferences, infrastructure, or workflow patterns.',
+            description: 'Store a durable memory (fact/preference/pattern/decision/outcome) that persists across sessions. Every write is scanned for secrets (16+ patterns — OpenAI/Stripe/AWS/GitHub/Slack/Google keys, private keys, connection strings, JWTs): by default detected secrets are redacted to [REDACTED] before storage, or the write is rejected if auto-redaction is disabled. Category and entity are auto-extracted when omitted, a local embedding is generated, and the content is deduplicated against existing memories. Returns: the memory id plus an outcome — "created" (new), "merged" (0.92–0.95 cosine to an existing memory; content/tags/confidence folded into it), or "duplicate" (≥0.95 cosine; not stored unless force:true). Use when you learn something worth remembering about the user, project, setup, or workflow; recall with engram_recall, delete with engram_forget.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -79,22 +79,24 @@ export class EngramMCPServer {
                 },
                 confidence: {
                   type: 'number',
-                  description: 'How confident you are this is accurate (0.0-1.0). Default 0.8. Use 1.0 for things the user explicitly stated. Use 0.5-0.7 for inferred preferences.',
+                  minimum: 0,
+                  maximum: 1,
+                  description: 'How confident this memory is accurate, 0.0–1.0 (default 0.8). Use 1.0 for facts the user explicitly stated, 0.5–0.7 for inferred preferences.',
                   default: 0.8
                 },
                 namespace: {
                   type: 'string',
-                  description: 'Project or scope for this memory. Use "default" for general memories, or a project name for project-specific ones.',
+                  description: 'Project/scope to store under (default "default"). Use a project name to isolate project-specific memories; "default" for general ones.',
                   default: 'default'
                 },
                 tags: {
                   type: 'array',
                   items: { type: 'string' },
-                  description: 'Optional tags for categorization'
+                  description: 'Optional string tags for categorization and retrieval, e.g. ["backend", "api"].'
                 },
                 force: {
                   type: 'boolean',
-                  description: 'Bypass deduplication check. If true, memory will be stored even if a similar one exists. Default: false',
+                  description: 'If true, bypass the duplicate check and store even when a ≥0.95-similar memory already exists (creates a near-identical copy — use sparingly). Default false.',
                   default: false
                 }
               },
@@ -103,7 +105,7 @@ export class EngramMCPServer {
           },
           {
             name: 'engram_recall',
-            description: 'Retrieve relevant memories for the current context. Call this at the start of a session or when you need to remember something about the user, their project, or their preferences. Returns the most relevant memories ranked by similarity and recency.',
+            description: 'Retrieve memories relevant to a query, ranked by a hybrid score. Embeds the query, gathers candidates (FTS5 top-20 plus in-namespace embeddings, optionally time-filtered), and scores each by similarity×0.45 + recency×0.15 + confidence×0.15 + access×0.05 + feedback×0.10 + a 0.1 FTS boost, then filters by category/threshold and returns the top results. If embedding generation fails it falls back to FTS-only search. Reading a memory bumps its last_accessed and access_count. Returns: an array of memory objects — each with id, content, category, entity, confidence, namespace, tags, timestamps, score, and scoreBreakdown — or an empty array if nothing clears the threshold (with a time_filter, the array also carries timeRange metadata). Use at session start or to look up a specific fact; prefer engram_context when you want a ready-to-inject block instead of raw results.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -113,26 +115,30 @@ export class EngramMCPServer {
                 },
                 limit: {
                   type: 'number',
-                  description: 'Maximum memories to return (1-20). Default 5. Keep low to avoid context pollution.',
+                  minimum: 1,
+                  maximum: 20,
+                  description: 'Maximum memories to return, 1–20 (default 5). Keep low to avoid context pollution.',
                   default: 5
                 },
                 category: {
                   type: 'string',
                   enum: ['preference', 'fact', 'pattern', 'decision', 'outcome'],
-                  description: 'Optional: filter by memory type'
+                  description: 'Optional filter by memory type (preference/fact/pattern/decision/outcome). Omit to search all types.'
                 },
                 namespace: {
                   type: 'string',
-                  description: 'Optional: filter by project/scope. Omit to search all namespaces.'
+                  description: 'Optional project/scope filter. Omit to search across all namespaces.'
                 },
                 threshold: {
                   type: 'number',
-                  description: 'Minimum relevance score (0.0-1.0). Default 0.3. Increase to get fewer, more relevant results.',
+                  minimum: 0,
+                  maximum: 1,
+                  description: 'Minimum relevance score to include a result, 0.0–1.0 (default 0.3). Raise for fewer, more precise results.',
                   default: 0.3
                 },
                 time_filter: {
                   type: 'object',
-                  description: 'Filter memories by time range. Supports relative times like "3 days ago", "last week", or ISO dates.',
+                  description: 'Restrict results to a time range by created/updated time. Provide after/before, or a period shorthand. Supports relative times like "3 days ago", "last week", or ISO dates.',
                   properties: {
                     after: {
                       type: 'string',
@@ -155,13 +161,13 @@ export class EngramMCPServer {
           },
           {
             name: 'engram_forget',
-            description: 'Remove a specific memory by ID. Use when a memory is outdated, incorrect, or the user asks you to forget something.',
+            description: 'Permanently delete one memory by id. Irreversible — also removes that memory\'s feedback rows. Returns: whether a memory with the given id was found and deleted; reports not-found without error if the id doesn\'t exist. Use when a memory is wrong, outdated, or the user asks you to forget it. If you\'re unsure, downvote with engram_feedback (helpful:false) instead of deleting.',
             inputSchema: {
               type: 'object',
               properties: {
                 memory_id: {
                   type: 'string',
-                  description: 'The ID of the memory to remove (returned by engram_recall)'
+                  description: 'The id of the memory to delete, as returned by engram_recall or engram_remember.'
                 }
               },
               required: ['memory_id']
@@ -169,21 +175,21 @@ export class EngramMCPServer {
           },
           {
             name: 'engram_feedback',
-            description: 'Provide feedback on a recalled memory to help improve future recall accuracy. Positive feedback increases a memory\'s relevance score; negative feedback decreases it.',
+            description: 'Record a helpful/unhelpful vote on a recalled memory to tune future ranking. Updates the memory\'s aggregated feedback_score (−1 to 1), which feeds the recall score (weight 0.10); after 5+ votes it may auto-adjust the memory\'s confidence (strongly negative lowers it, strongly positive raises it). Returns: the updated feedback stats for that memory. Call right after acting on a memory from engram_recall to close the learning loop; to remove a bad memory outright, use engram_forget instead.',
             inputSchema: {
               type: 'object',
               properties: {
                 memory_id: {
                   type: 'string',
-                  description: 'The ID of the memory to provide feedback on (returned by engram_recall)'
+                  description: 'The id of the memory being rated, taken from a prior engram_recall result.'
                 },
                 helpful: {
                   type: 'boolean',
-                  description: 'Was this memory helpful in the current context? true = helpful, false = not helpful'
+                  description: 'true if the memory was useful in this context (raises its feedback_score and future ranking), false if not (lowers it).'
                 },
                 context: {
                   type: 'string',
-                  description: 'Optional: describe the context or query that prompted this feedback'
+                  description: 'Optional note describing the query or situation that prompted this vote; stored for later review.'
                 }
               },
               required: ['memory_id', 'helpful']
@@ -191,43 +197,46 @@ export class EngramMCPServer {
           },
           {
             name: 'engram_context',
-            description: 'Generate a pre-formatted context block of relevant memories to inject into your system prompt or conversation. Use this at the start of a session to load relevant user context.',
+            description: 'Build a single pre-formatted context block from relevant memories, ready to inject into a system prompt at session start. With a query it selects semantically relevant memories; with no query it returns the top memories by access frequency and recency. The block is rendered in the requested format and truncated to fit max_tokens. Returns: one formatted string (not an array) — contrast with engram_recall, which returns raw scored memory objects. Use when you want drop-in context text; use engram_recall when you need structured results to reason over.',
             inputSchema: {
               type: 'object',
               properties: {
                 query: {
                   type: 'string',
-                  description: 'Optional query to filter relevant memories. If omitted, returns top memories by access frequency and recency.'
+                  description: 'Optional query to select relevant memories. If omitted, returns top memories by access frequency and recency.'
                 },
                 namespace: {
                   type: 'string',
-                  description: 'Namespace to pull context from (default: "default")',
+                  description: 'Namespace to pull memories from (default "default").',
                   default: 'default'
                 },
                 limit: {
                   type: 'number',
-                  description: 'Maximum memories to include (1-25). Default 10.',
+                  minimum: 1,
+                  maximum: 25,
+                  description: 'Maximum memories to include, 1–25 (default 10).',
                   default: 10
                 },
                 format: {
                   type: 'string',
                   enum: ['markdown', 'xml', 'json', 'plain'],
-                  description: 'Output format. markdown=human-readable, xml=structured, json=programmatic, plain=raw text',
+                  description: 'Output format (default markdown): markdown=human-readable headings, xml=structured tags, json=machine-parseable, plain=raw text.',
                   default: 'markdown'
                 },
                 include_metadata: {
                   type: 'boolean',
-                  description: 'Include memory IDs and confidence scores in output',
+                  description: 'If true, append each memory\'s id and confidence to the output (markdown and xml formats only). Default false.',
                   default: false
                 },
                 categories: {
                   type: 'array',
                   items: { type: 'string' },
-                  description: 'Filter by categories (e.g., ["preference", "fact"])'
+                  description: 'Optional list of memory types to include, e.g. ["preference", "fact"]; omit for all.'
                 },
                 max_tokens: {
                   type: 'number',
-                  description: 'Approximate token budget. Will truncate to fit. Default 1000.',
+                  minimum: 50,
+                  description: 'Approximate token budget for the block; lower-priority memories are dropped to fit (default 1000).',
                   default: 1000
                 }
               }
@@ -235,7 +244,7 @@ export class EngramMCPServer {
           },
           {
             name: 'engram_status',
-            description: 'Check Engram health and stats. Returns memory count, database size, embedding model status, and configuration.',
+            description: 'Report Engram health and statistics. Read-only and parameter-free. Returns: memory counts by category and namespace, embedding-model status (name, cached/loaded state, size), the database location, and key config (default namespace, recall limit, confidence threshold, secret-detection on/off). Use as a diagnostics/health check — to confirm the model is loaded and see how many memories exist — before relying on recall.',
             inputSchema: {
               type: 'object',
               properties: {}
