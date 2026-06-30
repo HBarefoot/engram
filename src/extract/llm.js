@@ -18,6 +18,33 @@ const VALID_CATEGORIES = ['preference', 'fact', 'pattern', 'decision', 'outcome'
 // write snappy. Overridable via config.llm.timeoutMs.
 const EXTRACTION_TIMEOUT_MS = 8000;
 
+// JSON Schema for constrained decoding: the model is forced to emit exactly this
+// shape (Ollama structured outputs), so a small model can't mis-format. The
+// strict validation below stays as the safety net regardless.
+const EXTRACTION_SCHEMA = {
+  type: 'object',
+  properties: {
+    category: { type: 'string', enum: VALID_CATEGORIES },
+    entity: { type: ['string', 'null'] },
+    confidence: { type: 'number', minimum: 0, maximum: 1 }
+  },
+  required: ['category', 'entity', 'confidence']
+};
+
+// A few compact, in-prompt examples lift small-model accuracy on the one task
+// that benefits — entity extraction for names outside the rule extractor's
+// keyword list, and the implicit categories rules default to 'fact'. These are
+// deliberately NOT drawn from the extraction benchmark fixture, so bench numbers
+// stay honest.
+const FEW_SHOT =
+  'Examples:\n' +
+  'Memory: "Honestly I\'d take Rust over C++ for new services any day." => ' +
+  '{"category":"preference","entity":"Rust","confidence":0.7}\n' +
+  'Memory: "We adopted Kubernetes after the VM sprawl got unmanageable." => ' +
+  '{"category":"decision","entity":"Kubernetes","confidence":0.8}\n' +
+  'Memory: "We pair-program every new feature before it merges." => ' +
+  '{"category":"pattern","entity":"pair programming","confidence":0.7}';
+
 /**
  * Extract a structured memory, optionally enhanced by a local LLM.
  * @param {string} content - Raw memory content
@@ -36,21 +63,22 @@ export async function extractMemoryLLM(content, options = {}, config = null) {
   try {
     const system =
       'You classify a single memory for an AI agent memory store. ' +
-      'Respond with ONLY a JSON object, no prose.';
+      'Respond with ONLY a JSON object, no prose.\n' +
+      `Definitions — preference: a like/dislike; fact: an objective truth; ` +
+      `pattern: a recurring workflow; decision: a choice + rationale; ` +
+      `outcome: the result of an action.\n` +
+      FEW_SHOT;
     const prompt =
       `Classify this memory and return JSON.\n\n` +
       `Memory: """${content}"""\n\n` +
       `Return: {"category": one of [${VALID_CATEGORIES.join(', ')}], ` +
       `"entity": a short noun phrase the memory is about (or null), ` +
-      `"confidence": a number 0..1 for how factual/reliable this memory is}.\n` +
-      `Definitions — preference: a like/dislike; fact: an objective truth; ` +
-      `pattern: a recurring workflow; decision: a choice + rationale; ` +
-      `outcome: the result of an action.`;
+      `"confidence": a number 0..1 for how factual/reliable this memory is}.`;
 
     const out = await llmComplete(config, {
       system,
       prompt,
-      json: true,
+      schema: EXTRACTION_SCHEMA,
       timeoutMs: config.llm?.timeoutMs ?? EXTRACTION_TIMEOUT_MS
     });
     if (!out || typeof out !== 'object') {

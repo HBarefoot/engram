@@ -125,6 +125,61 @@ function camel(s) {
   return s.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
 }
 
+function dash(s) {
+  return s.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase());
+}
+
+/**
+ * Strictly validate the raw argv against an allowlist spec, throwing on anything
+ * unexpected. This is the "fail loud" guard: a bare positional, an unknown flag,
+ * or a boolean flag that swallowed a value (e.g. `--judge qwen3.5:9b`, which used
+ * to silently leave --model on its default and mask a model swap) all error out
+ * instead of degrading quietly.
+ *
+ * @param {string[]} argv - raw args (process.argv.slice(2))
+ * @param {Object<string,'string'|'number'|'boolean'>} spec - camelCase flag -> type
+ */
+export function validateArgs(argv, spec) {
+  const known = new Map(); // dash-flag -> type
+  for (const [k, type] of Object.entries(spec)) known.set(dash(k), type);
+  const knownList = [...known.keys()].map((f) => `--${f}`).join(', ');
+
+  for (let i = 0; i < argv.length; i++) {
+    const tok = argv[i];
+    if (!tok.startsWith('--')) {
+      throw new Error(`Unexpected argument "${tok}". Expected a --flag. Known flags: ${knownList}`);
+    }
+    let flag = tok.slice(2);
+    let inlineVal;
+    if (flag.includes('=')) [flag, inlineVal] = flag.split(/=(.*)/s);
+
+    const type = known.get(flag);
+    if (type === undefined) {
+      throw new Error(`Unknown argument "--${flag}". Known flags: ${knownList}`);
+    }
+
+    if (type === 'boolean') {
+      if (inlineVal !== undefined) {
+        throw new Error(`--${flag} is a boolean flag and takes no value (got "${inlineVal}").`);
+      }
+      // A following non-flag token means the value was meant for a different
+      // flag (the classic --judge <model> mistake). Fail instead of swallowing.
+      if (i + 1 < argv.length && !argv[i + 1].startsWith('--')) {
+        throw new Error(
+          `--${flag} is a boolean flag and takes no value (got "${argv[i + 1]}"). ` +
+            `Did you mean to attach that value to a different flag?`
+        );
+      }
+    } else if (inlineVal === undefined) {
+      // value-taking flag: must be followed by a value
+      if (i + 1 >= argv.length || argv[i + 1].startsWith('--')) {
+        throw new Error(`--${flag} expects a value.`);
+      }
+      i++; // consume the value token
+    }
+  }
+}
+
 /** Percentile (p in 0..100) of a numeric array (not required pre-sorted). */
 export function percentile(values, p) {
   if (!values.length) return 0;

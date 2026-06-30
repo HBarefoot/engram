@@ -7,7 +7,12 @@
  * because the optional local LLM is absent.
  *
  * Usage:
- *   node bench/e2e-ollama.mjs [--model llama3.2:3b] [--k 5] [--judge] [--host http://localhost:11434]
+ *   node bench/e2e-ollama.mjs [--model llama3.2:3b] [--judge-model <name>] [--k 5] \
+ *       [--judge] [--think] [--host http://localhost:11434]
+ *
+ * Thinking is OFF by default (fast + cool small-model bursts); pass --think to
+ * re-enable the reasoning trace. --judge-model lets the grader be a different
+ * (often stronger) model than the answerer; it defaults to --model.
  */
 import {
   loadConfig,
@@ -29,6 +34,7 @@ import {
   enforceOfflineIfModelCached,
   getMachineInfo,
   parseArgs,
+  validateArgs,
   loadFixture,
   writeResults,
   table,
@@ -37,12 +43,29 @@ import {
   seedMemories
 } from './lib/common.mjs';
 
+try {
+  validateArgs(process.argv.slice(2), {
+    model: 'string',
+    judgeModel: 'string',
+    judge: 'boolean',
+    think: 'boolean',
+    k: 'number',
+    host: 'string',
+    seed: 'number'
+  });
+} catch (err) {
+  console.error(`Argument error: ${err.message}`);
+  process.exit(1);
+}
+
 const args = parseArgs();
 const HOST = args.host ?? 'http://localhost:11434';
 const MODEL = args.model ?? 'llama3.2:3b';
+const JUDGE_MODEL = args.judgeModel ?? MODEL;
 const K = args.k ?? 5;
 const SEED = args.seed ?? 42;
 const USE_JUDGE = !!args.judge;
+const THINK = !!args.think;
 
 async function httpJson(url, opts = {}, timeoutMs = 120000) {
   const ctrl = new AbortController();
@@ -75,6 +98,7 @@ async function chat(model, system, user) {
   const body = {
     model,
     stream: false,
+    think: THINK, // OFF by default — fast, cool small-model bursts (--think to re-enable)
     options: { temperature: 0, seed: SEED },
     messages: [
       { role: 'system', content: system },
@@ -131,8 +155,8 @@ async function main() {
         '  4. Re-run:           npm run bench:e2e\n'
     );
   }
-  const hasModel = reach.models.some((m) => m === MODEL || m.startsWith(`${MODEL}:`));
-  if (!hasModel) {
+  const pulled = (m) => reach.models.some((x) => x === m || x.startsWith(`${m}:`));
+  if (!pulled(MODEL)) {
     skip(
       `Ollama is up at ${HOST}, but model "${MODEL}" is not pulled.\n` +
         `Pulled models: ${reach.models.join(', ') || '(none)'}\n\n` +
@@ -141,16 +165,29 @@ async function main() {
         'Note: ":cloud" models route to Ollama\'s cloud and are NOT local — avoid them for this offline benchmark.\n'
     );
   }
-  if (MODEL.endsWith(':cloud')) {
+  // The judge can be a different (often stronger) model; it must also be local + pulled.
+  if (USE_JUDGE && JUDGE_MODEL !== MODEL && !pulled(JUDGE_MODEL)) {
     skip(
-      `Refusing to run against "${MODEL}": ":cloud" models route to Ollama's cloud, ` +
-        'which violates this suite\'s 100%-local rule. Use a local model, e.g. llama3.2:3b.\n'
+      `Judge model "${JUDGE_MODEL}" is not pulled.\n` +
+        `Pull it locally with:  ollama pull ${JUDGE_MODEL}\n` +
+        `Or use the answerer as judge:  drop --judge-model\n`
     );
+  }
+  for (const m of [MODEL, USE_JUDGE ? JUDGE_MODEL : null]) {
+    if (m && m.endsWith(':cloud')) {
+      skip(
+        `Refusing to run against "${m}": ":cloud" models route to Ollama's cloud, ` +
+          'which violates this suite\'s 100%-local rule. Use a local model, e.g. llama3.2:3b.\n'
+      );
+    }
   }
 
   section('Engram — End-to-End (local Ollama)');
   printMachine(machine);
-  console.log(`Model: ${MODEL} @ ${HOST} | k=${K} | temperature=0 | seed=${SEED} | judge=${USE_JUDGE}`);
+  console.log(
+    `Model: ${MODEL} @ ${HOST} | judge: ${USE_JUDGE ? JUDGE_MODEL : 'off'} | ` +
+      `k=${K} | temperature=0 | seed=${SEED} | think=${THINK}`
+  );
 
   const corpus = loadFixture('retrieval-set.json');
   const qa = loadFixture('qa-set.json');
@@ -175,7 +212,7 @@ async function main() {
     // deliberately wrong answer and confirm it returns NO before trusting it.
     if (USE_JUDGE) {
       const probe = await judge(
-        MODEL,
+        JUDGE_MODEL,
         'What database is used in production?',
         'It uses MySQL.',
         ['PostgreSQL']
@@ -212,7 +249,7 @@ async function main() {
 
       let judged = null;
       if (USE_JUDGE) {
-        judged = await judge(MODEL, item.question, text, item.expected_keywords || []);
+        judged = await judge(JUDGE_MODEL, item.question, text, item.expected_keywords || []);
         if (judged != null) {
           judgeCount++;
           if (judged) judgePass++;
@@ -260,8 +297,9 @@ async function main() {
       kind: 'e2e-ollama',
       machine,
       model: MODEL,
+      judgeModel: USE_JUDGE ? JUDGE_MODEL : null,
       host: HOST,
-      params: { k: K, temperature: 0, seed: SEED, judge: USE_JUDGE },
+      params: { k: K, temperature: 0, seed: SEED, judge: USE_JUDGE, think: THINK },
       summary: {
         questions: n,
         keywordAccuracy: kwAccuracy,
