@@ -113,7 +113,8 @@ memories (
   last_accessed INTEGER,
   access_count INTEGER DEFAULT 0,
   decay_rate REAL DEFAULT 0.01,
-  feedback_score REAL DEFAULT 0.0   -- Aggregated helpful/unhelpful score, [-1, 1]
+  feedback_score REAL DEFAULT 0.0,  -- Aggregated helpful/unhelpful score, [-1, 1]
+  extraction_method TEXT DEFAULT 'rules' -- 'rules' | 'llm' (which extractor produced category/entity)
 )
 
 memory_feedback (
@@ -198,6 +199,7 @@ Fastify, mounted at `localhost:3838` by default. Endpoints (paths only; see file
 - **Memories CRUD**: `POST /api/memories`, `GET /api/memories`, `POST /api/memories/search`, `GET /api/memories/:id`, `DELETE /api/memories/:id`, `POST /api/memories/bulk-delete`
 - **Maintenance**: `POST /api/consolidate`, `GET /api/conflicts` (legacy tag-based view)
 - **Contradictions**: `GET /api/contradictions`, `POST /api/contradictions/:id/resolve`, `GET /api/contradictions/count`
+- **LLM layer**: `GET/PUT /api/config/llm` (apiKey redacted to `hasApiKey` on GET), `POST /api/llm/test`, `GET /api/llm/status` (live reachability/model/latency; throttled ≤1 probe/30s), `GET /api/llm/stats` (counters + recent-events feed from `src/llm/stats.js`)
 - **Analytics**: `GET /api/analytics/{overview,stale,never-recalled,duplicates,trends}`
 - **Export**: `POST /api/export/static`
 - **Import**: `GET /api/import/sources`, `POST /api/import/scan`, `POST /api/import/commit`
@@ -267,7 +269,8 @@ Key directories:
 - `src/` — Core implementation
   - `server/` — `mcp.js` (6 stdio tools) + `rest.js` (Fastify, serves dashboard static)
   - `memory/` — `store.js`, `recall.js`, `consolidate.js`, `feedback.js`, `context.js`, `health.js`, `analytics.js`
-  - `extract/` — `rules.js` (category/entity extraction), `secrets.js` (secret detection)
+  - `extract/` — `rules.js` (category/entity extraction), `llm.js` (`extractMemoryLLM` wrapper), `secrets.js` (secret detection)
+  - `llm/` — `index.js` (opt-in local LLM client: `isLLMEnabled`/`llmComplete`/`testLLM`), `stats.js` (in-process observability tracker)
   - `embed/` — `index.js` (lazy `@xenova/transformers` loader, cosine similarity)
   - `import/` — `index.js`, `wizard.js`, and `parsers/{cursorrules,claude,package,git,ssh,shell,obsidian,env}.js`
   - `export/` — `static.js` (engram-context export)
@@ -313,7 +316,7 @@ Key settings:
 - `consolidation.decayEnabled` — Whether to apply confidence decay (default: true)
 - `security.secretDetection` — Secret detection toggle (default: true)
 - `security.auditLog` — Audit logging toggle (default: false)
-- `llm.*` — `provider`, `endpoint`, `model`, `apiKey` (plus optional `timeoutMs`). **Layer 1 of the onion architecture** (opt-in LLM enhancement), now **implemented** and consumed by `src/llm/index.js`. **Off by default** (`provider: null`): when null, code makes zero LLM calls and behaves exactly like the rule-based path. When set to `ollama` (default endpoint `http://localhost:11434`) or `openai-compatible`, the layer is used in two places, each wrapped in a timeout + try/catch that falls back to rules on any failure: (1) extraction — `extractMemoryLLM(content, options, config)` in `src/extract/llm.js` wraps the untouched synchronous `extractMemory` to sharpen `category`/`entity`/`confidence`; (2) contradiction detection — `detectContradictionsForMemory`/`findContradictions` in `src/memory/consolidate.js` take an optional `config` and use the LLM only to *confirm* heuristic hits (drops a flag only when the model explicitly says "not a contradiction"; keeps it on any failure). `config` is threaded through the MCP handler (`this.config`), the REST server (closure `config`), and the CLI. REST surface: `GET/PUT /api/config/llm` (apiKey redacted to `hasApiKey` on GET) and `POST /api/llm/test`. Desktop exposes it under Preferences → "AI Enhancement". Do **not** remove these fields; they are load-bearing.
+- `llm.*` — `provider`, `endpoint`, `model`, `apiKey` (plus optional `timeoutMs`). **Layer 1 of the onion architecture** (opt-in LLM enhancement), now **implemented** and consumed by `src/llm/index.js`. **Off by default** (`provider: null`): when null, code makes zero LLM calls and behaves exactly like the rule-based path. When set to `ollama` (default endpoint `http://localhost:11434`) or `openai-compatible`, the layer is used in two places, each wrapped in a timeout + try/catch that falls back to rules on any failure: (1) extraction — `extractMemoryLLM(content, options, config)` in `src/extract/llm.js` wraps the untouched synchronous `extractMemory` to sharpen `category`/`entity`/`confidence`; (2) contradiction detection — `detectContradictionsForMemory`/`findContradictions` in `src/memory/consolidate.js` take an optional `config` and use the LLM only to *confirm* heuristic hits (drops a flag only when the model explicitly says "not a contradiction"; keeps it on any failure). `config` is threaded through the MCP handler (`this.config`), the REST server (closure `config`), and the CLI. REST surface: `GET/PUT /api/config/llm` (apiKey redacted to `hasApiKey` on GET) and `POST /api/llm/test`. Desktop exposes it under Preferences → "AI Enhancement". Do **not** remove these fields; they are load-bearing. **Observability (v1.8.0):** `src/llm/stats.js` is an in-process singleton (counters + 50-entry recent-events ring buffer; `recordCall`/`recordEvent`/`getStats`/`reset`) written to by `llmComplete` (call/latency/failure/timeout counters), `extractMemoryLLM` (`enhanced`/`fallback` events), and `llmConfirmsContradiction` (`confirmed`/`filtered` events). Surfaced via `GET /api/llm/status` + `GET /api/llm/stats`. All local, no telemetry. When the layer is disabled, nothing is recorded and no network call is made. Each LLM-extracted memory is tagged with the `extraction_method` column (`'rules'` default, `'llm'` when the model's result was used).
 
 ## Common Patterns
 

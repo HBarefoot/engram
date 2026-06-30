@@ -35,6 +35,39 @@ const DEFAULT_LLM: LlmForm = {
   model: "llama3.2:3b",
 };
 
+interface LlmLiveStatus {
+  enabled: boolean;
+  provider: string | null;
+  model: string | null;
+  endpoint: string | null;
+  reachable: boolean;
+  latencyMs: number | null;
+  checkedAt: string | null;
+}
+
+interface LlmEvent {
+  ts: number;
+  op: string;
+  outcome: string;
+  latencyMs: number | null;
+  model: string | null;
+}
+
+interface LlmStats {
+  enabled: boolean;
+  calls: number;
+  failures: number;
+  timeouts: number;
+  extractionsEnhanced: number;
+  extractionsFallback: number;
+  contradictionsConfirmed: number;
+  contradictionsFiltered: number;
+  avgLatencyMs: number;
+  lastError: { message: string; at: number } | null;
+  lastCallAt: number | null;
+  recentEvents: LlmEvent[];
+}
+
 const TABS: { id: Tab; label: string }[] = [
   { id: "general", label: "General" },
   { id: "agents", label: "Agents" },
@@ -72,6 +105,8 @@ export default function Preferences() {
   const [llmStatus, setLlmStatus] = useState<string | null>(null);
   const [llmTesting, setLlmTesting] = useState(false);
   const [llmSaving, setLlmSaving] = useState(false);
+  const [liveStatus, setLiveStatus] = useState<LlmLiveStatus | null>(null);
+  const [stats, setStats] = useState<LlmStats | null>(null);
   const navigate = useNavigate();
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -93,6 +128,31 @@ export default function Preferences() {
     if (activeTab === "ai") {
       loadLlmConfig();
     }
+  }, [activeTab]);
+
+  // Poll live LLM status + activity stats while the AI tab is open.
+  useEffect(() => {
+    if (activeTab !== "ai") return;
+    let active = true;
+    async function poll() {
+      try {
+        const [s, st] = await Promise.all([
+          fetch(`${getApiBase()}/llm/status`).then((r) => (r.ok ? r.json() : null)),
+          fetch(`${getApiBase()}/llm/stats`).then((r) => (r.ok ? r.json() : null)),
+        ]);
+        if (!active) return;
+        if (s) setLiveStatus(s);
+        if (st) setStats(st);
+      } catch {
+        // sidecar not reachable — leave previous values
+      }
+    }
+    poll();
+    const id = setInterval(poll, 20000);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
   }, [activeTab]);
 
   async function loadLlmConfig() {
@@ -367,12 +427,12 @@ export default function Preferences() {
                   role="switch"
                   aria-checked={prefs.startAtLogin}
                   onClick={() => handleStartAtLogin(!prefs.startAtLogin)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
                     prefs.startAtLogin ? "bg-indigo-600" : "bg-gray-300 dark:bg-gray-600"
                   }`}
                 >
                   <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    className={`inline-block h-4 w-4 shrink-0 transform rounded-full bg-white transition-transform ${
                       prefs.startAtLogin ? "translate-x-6" : "translate-x-1"
                     }`}
                   />
@@ -393,12 +453,12 @@ export default function Preferences() {
                   role="switch"
                   aria-checked={prefs.soundOnSave}
                   onClick={() => updatePref("soundOnSave", !prefs.soundOnSave)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
                     prefs.soundOnSave ? "bg-indigo-600" : "bg-gray-300 dark:bg-gray-600"
                   }`}
                 >
                   <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    className={`inline-block h-4 w-4 shrink-0 transform rounded-full bg-white transition-transform ${
                       prefs.soundOnSave ? "translate-x-6" : "translate-x-1"
                     }`}
                   />
@@ -627,12 +687,12 @@ export default function Preferences() {
                   role="switch"
                   aria-checked={prefs.enableRestApi}
                   onClick={() => updatePref("enableRestApi", !prefs.enableRestApi)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
                     prefs.enableRestApi ? "bg-indigo-600" : "bg-gray-300 dark:bg-gray-600"
                   }`}
                 >
                   <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    className={`inline-block h-4 w-4 shrink-0 transform rounded-full bg-white transition-transform ${
                       prefs.enableRestApi ? "translate-x-6" : "translate-x-1"
                     }`}
                   />
@@ -687,17 +747,42 @@ export default function Preferences() {
                   role="switch"
                   aria-checked={llm.enabled}
                   onClick={() => setLlm((p) => ({ ...p, enabled: !p.enabled }))}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
                     llm.enabled ? "bg-indigo-600" : "bg-gray-300 dark:bg-gray-600"
                   }`}
                 >
                   <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    className={`inline-block h-4 w-4 shrink-0 transform rounded-full bg-white transition-transform ${
                       llm.enabled ? "translate-x-6" : "translate-x-1"
                     }`}
                   />
                 </button>
               </label>
+
+              {/* Live status badge */}
+              <div className="flex items-center gap-2 px-1 text-sm">
+                {!liveStatus || !liveStatus.enabled ? (
+                  <>
+                    <span className="text-gray-400">○</span>
+                    <span style={{ color: "rgba(var(--text-secondary), 1)" }}>
+                      Disabled — using built-in rule-based extraction
+                    </span>
+                  </>
+                ) : liveStatus.reachable ? (
+                  <>
+                    <span className="text-green-500">●</span>
+                    <span>
+                      Connected · {liveStatus.model}
+                      {liveStatus.latencyMs != null ? ` · ${liveStatus.latencyMs} ms` : ""}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-amber-500">●</span>
+                    <span>Unreachable — falling back to rules</span>
+                  </>
+                )}
+              </div>
 
               {llm.enabled && (
                 <>
@@ -765,6 +850,71 @@ export default function Preferences() {
                   {llmSaving ? "Saving…" : "Save"}
                 </button>
               </div>
+
+              {/* Activity stats + recent events (preview of the upcoming Live Agent Activity feed) */}
+              {liveStatus?.enabled && stats && (
+                <div className="space-y-3 pt-2">
+                  <h3 className="text-sm font-semibold">Activity</h3>
+                  {stats.calls === 0 ? (
+                    <p
+                      className="text-xs p-3 rounded-lg bg-gray-50 dark:bg-gray-800"
+                      style={{ color: "rgba(var(--text-secondary), 1)" }}
+                    >
+                      No AI activity yet — store a memory and it'll show up here.
+                    </p>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-2">
+                        {([
+                          ["Enhanced extractions", stats.extractionsEnhanced],
+                          ["Fell back to rules", stats.extractionsFallback],
+                          ["Contradictions filtered", stats.contradictionsFiltered],
+                          ["Total calls", stats.calls],
+                          ["Avg latency", `${stats.avgLatencyMs} ms`],
+                          ["Timeouts / failures", `${stats.timeouts} / ${stats.failures}`],
+                        ] as [string, string | number][]).map(([label, value]) => (
+                          <div
+                            key={label}
+                            className="p-3 rounded-lg border border-gray-200 dark:border-gray-700"
+                          >
+                            <p className="text-xs" style={{ color: "rgba(var(--text-secondary), 1)" }}>
+                              {label}
+                            </p>
+                            <p className="text-lg font-semibold">{value}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {stats.lastError && (
+                        <p
+                          className="text-xs p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300"
+                        >
+                          Last error: {stats.lastError.message} ({new Date(stats.lastError.at).toLocaleTimeString()})
+                        </p>
+                      )}
+
+                      <div>
+                        <p className="text-xs font-medium mb-1">Recent activity</p>
+                        <div className="space-y-1">
+                          {stats.recentEvents.slice(0, 15).map((ev, i) => (
+                            <div
+                              key={i}
+                              className="flex items-center justify-between text-xs font-mono px-2 py-1 rounded bg-gray-50 dark:bg-gray-800"
+                            >
+                              <span style={{ color: "rgba(var(--text-secondary), 1)" }}>
+                                {new Date(ev.ts).toLocaleTimeString()} · {ev.op} · {ev.outcome}
+                              </span>
+                              <span style={{ color: "rgba(var(--text-secondary), 1)" }}>
+                                {ev.latencyMs != null ? `${ev.latencyMs} ms` : ""}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               {llmStatus && (
                 <p

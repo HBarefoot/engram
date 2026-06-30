@@ -134,12 +134,14 @@ program
         entity: options.entity,
         confidence: options.confidence,
         namespace: options.namespace,
-        source: 'cli'
+        source: 'cli',
+        extraction_method: 'rules'
       };
 
       if (!options.entity) {
         const extracted = await extractMemoryLLM(content, { source: 'cli', namespace: options.namespace }, config);
         memoryData.entity = extracted.entity;
+        memoryData.extraction_method = extracted.extraction_method || 'rules';
       }
 
       // Generate embedding with spinner

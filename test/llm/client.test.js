@@ -141,16 +141,16 @@ describe('testLLM', () => {
 });
 
 describe('extractMemoryLLM', () => {
-  it('disabled path makes no network call and matches rule-based output exactly', async () => {
+  it('disabled path makes no network call and matches rule-based output (+ extraction_method: rules)', async () => {
     global.fetch = vi.fn();
     const content = 'User prefers Fastify over Express for Node APIs';
     const base = extractMemory(content, { source: 'test', namespace: 'ns' });
     const out = await extractMemoryLLM(content, { source: 'test', namespace: 'ns' }, null);
-    expect(out).toEqual(base);
+    expect(out).toEqual({ ...base, extraction_method: 'rules' });
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it('enhances category/entity/confidence when enabled, preserving base fields', async () => {
+  it('enhances category/entity/confidence when enabled, preserving base fields and marking llm', async () => {
     mockFetch(ollamaReply('{"category":"decision","entity":"web-framework","confidence":0.95}'));
     const out = await extractMemoryLLM('we went with fastify', { source: 'test', namespace: 'ns' }, ollamaCfg);
     expect(out.category).toBe('decision');
@@ -158,15 +158,16 @@ describe('extractMemoryLLM', () => {
     expect(out.confidence).toBe(0.95);
     expect(out.source).toBe('test');
     expect(out.namespace).toBe('ns');
+    expect(out.extraction_method).toBe('llm');
   });
 
-  it('falls back to rule-based output when the LLM fails', async () => {
+  it('falls back to rule-based output (extraction_method: rules) when the LLM fails', async () => {
     mockFetch(async () => {
       throw new Error('down');
     });
     const content = 'User prefers Fastify over Express';
     const base = extractMemory(content, { source: 'test' });
     const out = await extractMemoryLLM(content, { source: 'test' }, ollamaCfg);
-    expect(out).toEqual(base);
+    expect(out).toEqual({ ...base, extraction_method: 'rules' });
   });
 });
