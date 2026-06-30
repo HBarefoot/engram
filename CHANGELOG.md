@@ -6,52 +6,59 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
-### Changed
+## [1.8.0] - 2026-06-30
 
-- **LLM-layer hardening (resilience, cost, safety).** All behind `isLLMEnabled` — the disabled
-  default path is byte-identical (no calls, no latency):
-  - **Circuit breaker** (`src/llm/breaker.js`): after 3 consecutive failures/timeouts the breaker
-    opens for 60s; while open `llmComplete` returns null instantly (no network), so writes fall to
-    rules with zero added latency. First call after cooldown is a half-open trial. Thresholds
-    overridable via `llm.breakerThreshold` / `llm.breakerCooldownMs`. Transitions recorded in
-    stats; `GET /api/llm/status` now returns `breakerOpen` + `degraded`.
-  - **Latency budget:** extraction timeout lowered to 8s (one-shot classification), contradiction
-    confirmation 10s; both overridable via `llm.timeoutMs`. No retries (the breaker is the answer).
-  - **Cost guards:** bulk import stays rule-based and never calls the LLM per item; consolidation
-    caps LLM contradiction confirmations per run (default 25, `llm.maxContradictionConfirms`) and
-    keeps heuristic hits beyond the cap (records the skipped count).
-  - **Secret ordering:** the CLI `remember` path now passes validated/redacted content to the LLM
-    (was passing raw input); MCP + REST already did. The LLM never sees pre-redaction content.
-  - **Endpoint honesty:** `GET /api/llm/status` exposes `isLocalEndpoint`; the desktop AI tab warns
-    when a non-local endpoint is configured ("memory content will be sent to <host>").
-  - **Prompt-injection containment** (locked in + tested): model output is accepted only when it
-    validates (category ∈ enum, confidence ∈ [0,1], bounded entity, strict boolean for
-    contradictions); anything else falls back. Injected/extra fields never propagate.
-  - **Log hygiene:** LLM paths log only metadata (op/outcome/latency/model/error class) — never
-    memory content or prompts.
+Makes the optional local-LLM layer **observable** and **production-hardened**. All new behavior is
+behind `isLLMEnabled` — with the layer disabled (the default), behavior is byte-identical to before:
+no LLM calls, no added latency, nothing recorded.
 
 ### Added
 
-- **LLM-layer observability.** The optional local-LLM layer now reports what it's doing, all
-  computed **in-process and shown only to you** (no telemetry):
+- **LLM-layer observability** — local, in-process, no telemetry:
   - In-process stats tracker (`src/llm/stats.js`): counters for calls / failures / timeouts /
-    enhanced vs fallback extractions / contradictions confirmed vs filtered, average latency,
-    last error, plus a 50-entry recent-events ring buffer. Instruments `llmComplete`,
-    `extractMemoryLLM`, and the consolidation contradiction check.
-  - New REST endpoints: `GET /api/llm/status` (live reachability/model/latency, throttled to
-    one probe per 30s) and `GET /api/llm/stats` (counters + recent events) — clean JSON
-    contracts intended to back the upcoming Command Center / Live Agent Activity views.
-  - Desktop "AI Enhancement" tab now shows a live status badge, an activity stats panel, and a
+    enhanced vs fallback extractions / contradictions confirmed vs filtered, average latency, last
+    error, plus a 50-entry recent-events ring buffer. Instruments `llmComplete`, `extractMemoryLLM`,
+    and the consolidation contradiction check.
+  - New REST endpoints: `GET /api/llm/status` (live reachability/model/latency, throttled to one
+    probe per 30s) and `GET /api/llm/stats` (counters + recent events) — clean JSON contracts
+    intended to back the upcoming Command Center / Live Agent Activity views.
+  - Desktop "AI Enhancement" tab shows a live status badge, an activity stats panel, and a
     recent-events list (polled only while the tab is open).
-- **Per-memory `extraction_method` marker** (`'rules'` | `'llm'`) via an additive, idempotent
-  column migration. New memories record `'llm'` when the model's result was actually used; all
-  existing rows read as `'rules'`. Exposed on memory read endpoints for an "AI-enhanced" badge.
+- **Per-memory `extraction_method` marker** (`'rules'` | `'llm'`) via an additive, idempotent column
+  migration. New memories record `'llm'` when the model's result was actually used; existing rows
+  read as `'rules'`. Exposed on memory read endpoints for an "AI-enhanced" badge.
+
+### Changed
+
+- **Circuit breaker + latency budget** (`src/llm/breaker.js`): after 3 consecutive failures/timeouts
+  the breaker opens for 60s; while open `llmComplete` returns null instantly (no network), so writes
+  fall to rules with zero added latency. First call after cooldown is a half-open trial. Overridable
+  via `llm.breakerThreshold` / `llm.breakerCooldownMs`; transitions recorded in stats and surfaced as
+  `breakerOpen` + `degraded` on `GET /api/llm/status`. Extraction timeout lowered to 8s, contradiction
+  confirmation to 10s (overridable via `llm.timeoutMs`); no retries.
+- **Cost guards:** bulk import stays rule-based and never calls the LLM per item; consolidation caps
+  LLM contradiction confirmations per run (default 25, `llm.maxContradictionConfirms`) and keeps
+  heuristic hits beyond the cap (records the skipped count).
+- **Log hygiene:** LLM paths log only metadata (op/outcome/latency/model/error class) — never memory
+  content or prompts.
+
+### Security
+
+- **CLI secret-ordering fix (real bug):** the CLI `remember` path passed **raw** input to the LLM
+  extractor; it now passes the validated/redacted content, matching MCP and REST. The LLM never
+  receives pre-redaction content on any entry point.
+- **Endpoint honesty:** `GET /api/llm/status` exposes `isLocalEndpoint`; the desktop AI tab warns
+  when a non-local endpoint is configured ("memory content will be sent to <host>") — we don't claim
+  local privacy when it isn't true.
+- **Prompt-injection containment** (locked in + tested): model output is accepted only when it
+  validates (category ∈ enum, confidence ∈ [0,1], bounded entity, strict boolean for contradictions);
+  anything else falls back, and injected/extra fields never propagate.
 
 ### Fixed
 
-- **Preferences toggles no longer compress** next to long descriptions — the switch button and
-  knob now use `shrink-0`, so the AI Enhancement toggle (longest label) renders identically to
-  the others. (`desktop/src/pages/Preferences.tsx`.)
+- **Preferences toggles no longer compress** next to long descriptions — the switch button and knob
+  use `shrink-0`, so the AI Enhancement toggle (longest label) renders identically to the others.
+  (`desktop/src/pages/Preferences.tsx`.)
 
 ## [1.7.1] - 2026-06-30
 
