@@ -56,12 +56,41 @@ Results are written as JSON to `bench/results/<kind>-<timestamp>.json`.
 | retrieval | `--k` | `5` | cutoff for @k metrics |
 | retrieval | `--threshold` | `0` | recall score floor (0 = measure pure ranking at k) |
 | retrieval | `--min-mrr` / `--min-recall` | none | CI gates; exit non-zero if aggregate is below |
-| e2e | `--model` | `llama3.2:3b` | local Ollama model (pinned for reproducibility) |
+| extraction | `--model` | `llama3.2:3b` | single local Ollama model (rule vs that model) |
+| extraction | `--models` | none | comma list, **smallest-first**, to sweep (see below); overrides `--model` |
+| extraction | `--think` | off | re-enable the model's reasoning trace (default: thinking **off**) |
+| e2e | `--model` | `llama3.2:3b` | local Ollama model that answers (pinned for reproducibility) |
+| e2e | `--judge-model` | = `--model` | a separate (often stronger) model to grade answers |
 | e2e | `--host` | `http://localhost:11434` | Ollama endpoint |
 | e2e | `--k` | `5` | context memories recalled per question |
-| e2e | `--judge` | off | add an Ollama-as-judge correctness pass (same local model) |
+| e2e | `--judge` | off | add an Ollama-as-judge correctness pass |
+| e2e | `--think` | off | re-enable thinking for answer + judge calls (default: **off**) |
+
+> **Strict args.** Both Ollama benchmarks now **fail loud** on unknown flags, stray positionals,
+> and a boolean flag that swallowed a value — e.g. `--judge qwen3.5:9b` (missing `--judge-model`)
+> errors instead of silently leaving `--model` on its default. That class of mistake previously
+> masked a model swap.
 
 For accurate idle-RSS, run operational with `node --expose-gc bench/operational.mjs`.
+
+## Small-model sweep + the recommended model
+
+The LLM layer does *classification*, not generation, so it's tuned for **small models with
+constrained decoding + thinking off** (the layer forces a JSON schema and sends `think: false`).
+To find the smallest model that's actually worth running, sweep a ladder smallest-first:
+
+```bash
+node bench/extraction.mjs --models qwen3:0.6b,qwen3:1.7b,qwen3:4b,llama3.2:3b
+```
+
+It runs the rule-based extractor plus every *pulled* model (skipping ones you haven't pulled and
+any `:cloud` model), prints an entity-match/latency table, and names the **smallest** model that
+beats rules on entity match by ≥ 5 pts **without regressing category accuracy** (a tiny model that
+wins entity but tanks category is disqualified — entity gains aren't worth trading category away).
+That winner is the recommended base for `engram/extract`
+(see [`docs/llm/recommended-model.md`](../docs/llm/recommended-model.md) and
+[`models/engram-extract.Modelfile`](../models/engram-extract.Modelfile)). The ladder is read
+smallest-first; latency is hardware/model-dependent, so re-run it on your own machine.
 
 ## Metrics explained
 

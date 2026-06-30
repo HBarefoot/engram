@@ -31,7 +31,12 @@ async function llmConfirmsContradiction(config, contentA, contentB) {
         `Memory A: """${contentA}"""\nMemory B: """${contentB}"""\n\n` +
         `Do these directly contradict (cannot both be true at the same time)? ` +
         `Return {"contradicts": true or false}.`,
-      json: true,
+      // Constrained decoding forces a strict boolean — no free-text to misparse.
+      schema: {
+        type: 'object',
+        properties: { contradicts: { type: 'boolean' } },
+        required: ['contradicts']
+      },
       timeoutMs: config.llm?.timeoutMs ?? CONTRADICTION_TIMEOUT_MS
     });
     const model = config.llm.model;

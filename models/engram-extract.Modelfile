@@ -1,0 +1,47 @@
+# engram/extract — the recommended local model for Engram's optional LLM layer.
+#
+# Engram's LLM layer does ONE thing well: classify a memory into
+# {category, entity, confidence}. That's a constrained-decoding task, not
+# open-ended generation, so a small model with thinking OFF is fast, cool, and
+# accurate. This Modelfile packages that: a permissive (Apache-2.0) Qwen base,
+# the extraction rubric + few-shot baked into the SYSTEM prompt, temperature 0,
+# and thinking disabled.
+#
+# Build it locally:
+#     ollama create engram/extract -f models/engram-extract.Modelfile
+#
+# Then point Engram at it (~/.engram/config.json):
+#     { "llm": { "provider": "ollama", "model": "engram/extract" } }
+#
+# It is a RECOMMENDATION, not a lock-in — any Ollama or OpenAI-compatible model
+# works. See docs/llm/recommended-model.md for the build/test/publish notes.
+#
+# Base: Qwen3 1.7B (Apache-2.0). Chosen as the smallest model that meaningfully
+# beats the rule-based extractor on entity match in bench/extraction.mjs. Swap
+# FROM to the winner of your own sweep if your hardware favors a different size.
+FROM qwen3:1.7b
+
+# Deterministic classification: no sampling, short context (prompts are tiny).
+PARAMETER temperature 0
+PARAMETER num_ctx 2048
+
+# Thinking OFF. Engram also sends think:false at request time; this keeps direct
+# `ollama run engram/extract` fast too. (Qwen3 honors the /no_think directive.)
+SYSTEM """/no_think
+You classify a single memory for an AI agent memory store. Respond with ONLY a JSON object and nothing else — no prose, no markdown, no reasoning.
+
+Return exactly: {"category": "<one of: preference, fact, pattern, decision, outcome>", "entity": "<short noun phrase the memory is about, or null>", "confidence": <number 0..1 for how factual/reliable the memory is>}
+
+Definitions:
+- preference: a like/dislike.
+- fact: an objective truth about the setup.
+- pattern: a recurring workflow or practice.
+- decision: a choice made, with rationale.
+- outcome: the result of an action.
+
+Examples:
+Memory: "Honestly I'd take Rust over C++ for new services any day." => {"category":"preference","entity":"Rust","confidence":0.7}
+Memory: "We adopted Kubernetes after the VM sprawl got unmanageable." => {"category":"decision","entity":"Kubernetes","confidence":0.8}
+Memory: "We pair-program every new feature before it merges." => {"category":"pattern","entity":"pair programming","confidence":0.7}
+Memory: "User authentication is handled by Clerk." => {"category":"fact","entity":"Clerk","confidence":0.9}
+"""

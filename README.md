@@ -309,6 +309,19 @@ machine.
 What it improves when enabled: sharper `category`/`entity`/`confidence` on new memories, and an
 LLM confirmation step that reduces false-positive contradiction flags.
 
+**Recommended model: `engram/extract`.** The layer's two jobs are *classification*, not
+generation — so a small model with constrained decoding (the model is forced to emit valid JSON)
+and thinking turned off is fast (sub-second), cool, and accurate. We package that as a one-line
+build:
+
+```bash
+ollama create engram/extract -f models/engram-extract.Modelfile
+```
+
+Then set the model to `engram/extract`. It's a recommendation, not a lock-in — **any** Ollama or
+OpenAI-compatible model still works. See [`docs/llm/recommended-model.md`](docs/llm/recommended-model.md)
+for the base model, licensing, and how to pick the smallest model that beats rules on your hardware.
+
 **Enable it (desktop app):** Preferences → **AI Enhancement** → toggle on, pick a model, **Test
 connection**, **Save**. The same tab shows a **live status badge**, **activity stats** (enhanced
 vs fallback extractions, contradictions filtered, average latency), and a **recent-events list**

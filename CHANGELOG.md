@@ -6,6 +6,33 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+Tunes the optional local-LLM layer for **small models**: its two jobs (extraction and contradiction
+confirmation) are *classification*, where constrained decoding + thinking-off make a small model
+fast, cool, and reliable. All behind `isLLMEnabled` — the disabled default path stays byte-identical
+(no LLM calls, no added latency, nothing recorded).
+
+### Added
+
+- **Constrained decoding.** `llmComplete` accepts a JSON-Schema `schema` option and sends it as
+  Ollama's structured-output `format` (and `response_format` for openai-compatible), so the model is
+  forced to emit exactly `{category, entity, confidence}` (extraction) or `{contradicts}`
+  (contradiction). If an older Ollama rejects the schema, the call degrades once to `format: 'json'`
+  and the existing robust parse recovers the object. Strict validation stays as the safety net.
+- **Thinking-off + keep-alive.** Ollama requests now send `think: false` by default (the latency/heat
+  lever; opt back in with `llm.think: true`) and `keep_alive` (default `5m`, override `llm.keepAlive`)
+  so the model isn't reloaded per write.
+- **Few-shot extraction prompt** — a few compact examples (entities outside the rule extractor's
+  keyword list; deliberately not from the bench fixture) lift small-model entity accuracy.
+- **Recommended model `engram/extract`** — `models/engram-extract.Modelfile` (Apache-2.0 Qwen base,
+  extraction rubric + few-shot baked in, `temperature 0`, thinking-off) plus
+  `docs/llm/recommended-model.md`. Surfaced as a recommendation (not a lock-in) in the README and the
+  desktop AI-Enhancement model field. Publishing to the Ollama library is a documented manual step.
+- **Bench upgrades.** `bench/extraction.mjs` gains a `--models` smallest-first **sweep** that names
+  the smallest model beating rules on entity match (≥5 pts); `bench/e2e-ollama.mjs` gains
+  `--judge-model` (grade with a separate model) and `--think`. Both Ollama benches default to
+  thinking-off and now **fail loud** on unknown flags, stray positionals, and a boolean flag that
+  swallowed a value (e.g. `--judge qwen3.5:9b`), which previously masked a model swap.
+
 ## [1.8.0] - 2026-06-30
 
 Makes the optional local-LLM layer **observable** and **production-hardened**. All new behavior is

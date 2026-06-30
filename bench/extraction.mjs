@@ -9,12 +9,20 @@
  * For each labeled item it runs both extractors and scores category accuracy,
  * entity match rate, confidence calibration, and latency — per mode + delta.
  *
- * 100% local: the only LLM is a local Ollama. If Ollama or the pinned model is
- * absent, it prints the rule-based numbers and skips the LLM column with install
+ * Two modes:
+ *   - single model:  --model llama3.2:3b           (rule vs that one model)
+ *   - SWEEP a ladder: --models qwen3:0.6b,qwen3:1.7b,llama3.2:3b
+ *       runs rule + every pulled model with constrained decoding + thinking-off,
+ *       prints an entity-match/latency table, and names the SMALLEST model that
+ *       meaningfully beats rules on entity (the list is read smallest-first).
+ *
+ * 100% local: the only LLM is a local Ollama. If Ollama or a model is absent, it
+ * prints the rule-based numbers and skips/flags the LLM column with install
  * guidance (never fabricates an improvement).
  *
  * Usage:
  *   node bench/extraction.mjs [--model llama3.2:3b] [--host http://localhost:11434]
+ *   node bench/extraction.mjs --models qwen3:0.6b,qwen3:1.7b,llama3.2:3b [--think]
  */
 import { extractMemory } from '../src/extract/rules.js';
 import { extractMemoryLLM } from '../src/extract/llm.js';
@@ -26,6 +34,7 @@ import {
   mean,
   getMachineInfo,
   parseArgs,
+  validateArgs,
   loadFixture,
   writeResults,
   table,
@@ -33,11 +42,37 @@ import {
   printMachine
 } from './lib/common.mjs';
 
+try {
+  validateArgs(process.argv.slice(2), {
+    model: 'string',
+    models: 'string',
+    host: 'string',
+    think: 'boolean'
+  });
+} catch (err) {
+  console.error(`Argument error: ${err.message}`);
+  process.exit(1);
+}
+
 const args = parseArgs();
 const HOST = args.host ?? 'http://localhost:11434';
 const MODEL = args.model ?? 'llama3.2:3b';
+const THINK = !!args.think;
+// Sweep ladder, read smallest-first. When set, MODEL is ignored.
+const MODELS = args.models
+  ? String(args.models)
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+  : null;
 
-// --- Ollama reachability (mirrors bench/e2e-ollama.mjs) --------------------
+// Entity margin (pts) a model must beat rules by to count as "meaningfully better".
+const ENTITY_MARGIN = 0.05;
+// A model must not regress category accuracy by more than this vs rules — entity
+// gains aren't worth trading category away (small models often do exactly that).
+const CATEGORY_TOLERANCE = 0.02;
+
+// --- Ollama reachability ---------------------------------------------------
 async function httpJson(url, opts = {}, timeoutMs = 4000) {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -50,31 +85,17 @@ async function httpJson(url, opts = {}, timeoutMs = 4000) {
   }
 }
 
-async function checkOllama() {
-  if (MODEL.endsWith(':cloud')) {
-    return { available: false, reason: `Refusing "${MODEL}": ":cloud" models route off-machine — use a local model.` };
-  }
-  let tags;
+/** Fetch the pulled-model list, or null if Ollama is unreachable. */
+async function fetchTags() {
   try {
-    tags = await httpJson(`${HOST}/api/tags`, {}, 3000);
+    const tags = await httpJson(`${HOST}/api/tags`, {}, 3000);
+    return (tags.models || []).map((m) => m.name);
   } catch {
-    return {
-      available: false,
-      reason:
-        `Ollama not reachable at ${HOST}. Install + run it, then: ollama pull ${MODEL}\n` +
-        '   (brew install ollama / https://ollama.com/download)'
-    };
+    return null;
   }
-  const models = (tags.models || []).map((m) => m.name);
-  const hasModel = models.some((m) => m === MODEL || m.startsWith(`${MODEL}:`));
-  if (!hasModel) {
-    return {
-      available: false,
-      reason: `Ollama is up but "${MODEL}" isn't pulled. Run: ollama pull ${MODEL}\n   Pulled: ${models.join(', ') || '(none)'}`
-    };
-  }
-  return { available: true };
 }
+
+const isPulled = (models, m) => models.some((x) => x === m || x.startsWith(`${m}:`));
 
 // --- Scoring helpers -------------------------------------------------------
 /** Normalize an entity for matching: lowercase, strip all non-alphanumerics. */
@@ -127,59 +148,152 @@ function aggregate(scores, latencies) {
 const pct = (x) => (x === null ? 'n/a' : `${(x * 100).toFixed(1)}%`);
 const delta = (a, b) => (a === null || b === null ? 'n/a' : `${b - a >= 0 ? '+' : ''}${((b - a) * 100).toFixed(1)} pts`);
 
-async function main() {
-  quietLogs();
-  const machine = getMachineInfo();
-  section('Engram — Extraction-Quality Benchmark (rule-based vs local LLM)');
-  printMachine(machine);
-
-  const fixture = loadFixture('extraction-set.json');
-  const items = fixture.items;
-  console.log(`${items.length} labeled items.`);
-
-  const ollama = await checkOllama();
-  const llmConfig = { llm: { provider: 'ollama', endpoint: HOST, model: MODEL } };
-
-  // --- Rule-based (always) -------------------------------------------------
-  const ruleScores = [];
-  const ruleLat = [];
-  const perItem = [];
+/** Rule-based extraction over every item (always available, no network). */
+function runRuleExtractor(items) {
+  const scores = [];
+  const lat = [];
   for (const item of items) {
     const t0 = now();
     const out = extractMemory(item.content, { source: 'bench' });
-    ruleLat.push(now() - t0);
+    lat.push(now() - t0);
+    scores.push(scoreItem(item, out));
+  }
+  return { agg: aggregate(scores, lat), scores };
+}
+
+/**
+ * LLM extraction over every item via the real layer (constrained decoding +
+ * thinking-off, unless --think). Goes through extractMemoryLLM so what the bench
+ * measures is exactly what production does.
+ */
+async function runLLMExtractor(model, items) {
+  const cfg = { llm: { provider: 'ollama', endpoint: HOST, model, think: THINK } };
+  const scores = [];
+  const lat = [];
+  const perItem = [];
+  for (const item of items) {
+    const t0 = now();
+    const out = await extractMemoryLLM(item.content, { source: 'bench' }, cfg);
+    lat.push(now() - t0);
     const s = scoreItem(item, out);
-    ruleScores.push(s);
-    perItem.push({
-      id: item.id,
-      expected_category: item.expected_category,
-      rule: { category: out.category, entity: out.entity, confidence: out.confidence, ...s }
-    });
+    scores.push(s);
+    perItem.push({ category: out.category, entity: out.entity, confidence: out.confidence, ...s });
+  }
+  return { agg: aggregate(scores, lat), perItem };
+}
+
+// --- Sweep mode ------------------------------------------------------------
+async function runSweep(items, ruleAgg, tags, machine) {
+  section('Small-model sweep (constrained decoding + thinking-off)');
+  console.log(`Models (smallest-first): ${MODELS.join(', ')} @ ${HOST} | think=${THINK}`);
+  if (tags === null) {
+    console.log('\nOllama is not reachable — cannot run the sweep. Showing rule-based only.');
   }
 
-  // --- LLM (only if available) --------------------------------------------
-  let llmScores = null;
-  let llmLat = [];
-  if (ollama.available) {
-    console.log(`Running LLM extractor: ${MODEL} @ ${HOST} (temperature 0)...`);
-    llmScores = [];
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      const t0 = now();
-      const out = await extractMemoryLLM(item.content, { source: 'bench' }, llmConfig);
-      llmLat.push(now() - t0);
-      const s = scoreItem(item, out);
-      llmScores.push(s);
-      perItem[i].llm = { category: out.category, entity: out.entity, confidence: out.confidence, ...s };
+  const rows = [['rules', pct(ruleAgg.categoryAccuracy), pct(ruleAgg.entityMatchRate), pct(ruleAgg.confidenceInBand), `${ruleAgg.meanLatencyMs} ms`, '—']];
+  const swept = [];
+  for (const model of MODELS) {
+    if (tags === null || !isPulled(tags, model)) {
+      rows.push([model, 'not pulled', '—', '—', '—', tags === null ? 'ollama down' : `ollama pull ${model}`]);
+      continue;
     }
-  } else {
-    console.log(`\nLLM column SKIPPED — ${ollama.reason}`);
+    if (model.endsWith(':cloud')) {
+      rows.push([model, 'skipped', '—', '—', '—', ':cloud is non-local']);
+      continue;
+    }
+    process.stdout.write(`  running ${model}... `);
+    const { agg, perItem } = await runLLMExtractor(model, items);
+    process.stdout.write(`entity ${pct(agg.entityMatchRate)} @ ${agg.meanLatencyMs} ms\n`);
+    swept.push({ model, agg, perItem });
+    rows.push([
+      model,
+      pct(agg.categoryAccuracy),
+      pct(agg.entityMatchRate),
+      pct(agg.confidenceInBand),
+      `${agg.meanLatencyMs} ms`,
+      delta(ruleAgg.entityMatchRate, agg.entityMatchRate)
+    ]);
   }
 
-  const ruleAgg = aggregate(ruleScores, ruleLat);
-  const llmAgg = llmScores ? aggregate(llmScores, llmLat) : null;
+  section('Results');
+  console.log(table(['Model', 'Category', 'Entity', 'ConfBand', 'Latency/item', 'Δ entity vs rules'], rows));
+  console.log('(Models are read smallest-first; latency is hardware/model-dependent.)');
 
-  // --- Table ---------------------------------------------------------------
+  // Verdict: the smallest model that (a) beats rules on entity by the margin AND
+  // (b) doesn't regress category accuracy. A small model that wins entity but
+  // tanks category is NOT a good default.
+  section('Verdict');
+  const qualifies = (s) =>
+    s.agg.entityMatchRate - ruleAgg.entityMatchRate >= ENTITY_MARGIN &&
+    s.agg.categoryAccuracy >= ruleAgg.categoryAccuracy - CATEGORY_TOLERANCE;
+  const winner = swept.find(qualifies);
+  // Models that won entity but were disqualified for regressing category.
+  const entityOnly = swept.filter(
+    (s) => s.agg.entityMatchRate - ruleAgg.entityMatchRate >= ENTITY_MARGIN && !qualifies(s)
+  );
+  if (winner) {
+    console.log(
+      `Recommended default: ${winner.model} — entity ${pct(winner.agg.entityMatchRate)} ` +
+        `(${delta(ruleAgg.entityMatchRate, winner.agg.entityMatchRate)} vs rules), category ${pct(winner.agg.categoryAccuracy)} ` +
+        `(${delta(ruleAgg.categoryAccuracy, winner.agg.categoryAccuracy)}), at ~${winner.agg.meanLatencyMs} ms/item. ` +
+        `It is the smallest model that clears +${(ENTITY_MARGIN * 100).toFixed(0)} pts on entity without regressing category.`
+    );
+    if (entityOnly.length) {
+      console.log(
+        `(Skipped ${entityOnly.map((s) => s.model).join(', ')} — entity gain came with a category ` +
+          `regression beyond ${(CATEGORY_TOLERANCE * 100).toFixed(0)} pts, not worth the trade.)`
+      );
+    }
+  } else if (entityOnly.length) {
+    const best = entityOnly.reduce((a, b) => (b.agg.categoryAccuracy > a.agg.categoryAccuracy ? b : a));
+    console.log(
+      `No model both beat rules on entity AND held category. ` +
+        `Closest was ${best.model} (entity ${pct(best.agg.entityMatchRate)} but category ${pct(best.agg.categoryAccuracy)}, ` +
+        `${delta(ruleAgg.categoryAccuracy, best.agg.categoryAccuracy)}). Try a larger model or keep the layer off.`
+    );
+  } else if (swept.length) {
+    const best = swept.reduce((a, b) => (b.agg.entityMatchRate > a.agg.entityMatchRate ? b : a));
+    console.log(
+      `No model cleared +${(ENTITY_MARGIN * 100).toFixed(0)} pts on entity vs rules. ` +
+        `Best was ${best.model} (entity ${pct(best.agg.entityMatchRate)}, ${delta(ruleAgg.entityMatchRate, best.agg.entityMatchRate)}). ` +
+        `On this set the rule-based path is hard to beat — keep the LLM layer off or try a larger model.`
+    );
+  } else {
+    console.log('No models were runnable — pull at least one from the ladder and re-run.');
+  }
+
+  const file = writeResults('extraction-sweep', {
+    kind: 'extraction-sweep',
+    machine,
+    host: HOST,
+    think: THINK,
+    entityMargin: ENTITY_MARGIN,
+    ladder: MODELS,
+    recommended: winner ? winner.model : null,
+    aggregate: { rule: ruleAgg, models: swept.map((s) => ({ model: s.model, ...s.agg })) }
+  });
+  console.log(`\nWrote ${file}`);
+}
+
+// --- Single-model mode (rule vs one LLM) -----------------------------------
+async function runSingle(items, ruleAgg, ruleScores, tags, machine) {
+  const available = tags !== null && isPulled(tags, MODEL) && !MODEL.endsWith(':cloud');
+  let skipReason = null;
+  if (tags === null) skipReason = `Ollama not reachable at ${HOST}. Install + run it, then: ollama pull ${MODEL}`;
+  else if (MODEL.endsWith(':cloud')) skipReason = `Refusing "${MODEL}": ":cloud" models route off-machine — use a local model.`;
+  else if (!isPulled(tags, MODEL)) skipReason = `Ollama is up but "${MODEL}" isn't pulled. Run: ollama pull ${MODEL}`;
+
+  let llmAgg = null;
+  let perItem = [];
+  if (available) {
+    console.log(`Running LLM extractor: ${MODEL} @ ${HOST} (temperature 0, think=${THINK})...`);
+    const r = await runLLMExtractor(MODEL, items);
+    llmAgg = r.agg;
+    perItem = r.perItem;
+  } else {
+    console.log(`\nLLM column SKIPPED — ${skipReason}`);
+  }
+
   section('Results');
   const llmCell = (v) => (llmAgg ? v : 'skipped');
   console.log(
@@ -195,7 +309,6 @@ async function main() {
   );
   console.log('(Latency is hardware/model-dependent; the LLM path is expected to be far slower.)');
 
-  // --- Honest verdict ------------------------------------------------------
   section('Verdict');
   if (!llmAgg) {
     console.log(
@@ -216,17 +329,46 @@ async function main() {
     console.log(`The ${MODEL} extractor ${verdicts.join(' and ')}, at ~${llmAgg.meanLatencyMs} ms/item vs ${ruleAgg.meanLatencyMs} ms. ${net}`);
   }
 
+  // Per-item join (rule + llm) for the result file.
+  const detail = items.map((item, i) => ({
+    id: item.id,
+    expected_category: item.expected_category,
+    rule: { ...ruleScores[i] },
+    llm: perItem[i] ?? null
+  }));
+
   const file = writeResults('extraction', {
     kind: 'extraction',
     machine,
     model: MODEL,
     host: HOST,
+    think: THINK,
     llmAvailable: !!llmAgg,
-    llmSkipReason: llmAgg ? null : ollama.reason,
+    llmSkipReason: llmAgg ? null : skipReason,
     aggregate: { rule: ruleAgg, llm: llmAgg },
-    perItem
+    perItem: detail
   });
   console.log(`\nWrote ${file}`);
+}
+
+async function main() {
+  quietLogs();
+  const machine = getMachineInfo();
+  section('Engram — Extraction-Quality Benchmark (rule-based vs local LLM)');
+  printMachine(machine);
+
+  const fixture = loadFixture('extraction-set.json');
+  const items = fixture.items;
+  console.log(`${items.length} labeled items.`);
+
+  const { agg: ruleAgg, scores: ruleScores } = runRuleExtractor(items);
+  const tags = await fetchTags();
+
+  if (MODELS) {
+    await runSweep(items, ruleAgg, tags, machine);
+  } else {
+    await runSingle(items, ruleAgg, ruleScores, tags, machine);
+  }
 }
 
 main().catch((err) => {
