@@ -63,3 +63,10 @@ engram-build-prompt.md
 
 # Benchmark result artifacts (keep the dir via .gitkeep)
 bench/results/*.json
+
+# Internal strategy doc + working agent prompts (local only)
+
+ENGRAM_ACTION_PLAN.md
+
+docs/prompts/
+
