@@ -29,6 +29,7 @@
     "bench:ops": "node bench/operational.mjs",
     "bench:retrieval": "node bench/retrieval.mjs",
     "bench:e2e": "node bench/e2e-ollama.mjs",
+    "bench:extraction": "node bench/extraction.mjs",
     "pm2:start": "pm2 start ecosystem.config.cjs",
     "pm2:stop": "pm2 stop engram",
     "pm2:restart": "pm2 restart engram",
