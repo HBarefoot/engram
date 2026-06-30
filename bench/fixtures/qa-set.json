@@ -1,0 +1,18 @@
+{
+  "_schema": {
+    "questions": "Array of { id, question, expected_keywords (lowercased substrings; a correct answer should contain at least min_keywords of them), min_keywords (default 1) }. The corpus is the retrieval-set memories, seeded into a fresh bench DB; for each question the harness recalls top-k context, prompts a local Ollama model, and scores the answer by keyword match and (optionally) an Ollama-as-judge pass.",
+    "notes": "Answers are graded leniently by keyword; the judge pass adds a semantic check using the same local model. Both are 100% local."
+  },
+  "questions": [
+    { "id": "qa01", "question": "Which web framework does the team prefer for Node.js APIs, and why?", "expected_keywords": ["fastify"], "min_keywords": 1 },
+    { "id": "qa02", "question": "What database is used in production and what version is it?", "expected_keywords": ["postgres", "postgresql", "15"], "min_keywords": 2 },
+    { "id": "qa03", "question": "What package manager did they switch to, and what was the result?", "expected_keywords": ["pnpm"], "min_keywords": 1 },
+    { "id": "qa04", "question": "Which model is used to generate embeddings, and where does it run?", "expected_keywords": ["minilm", "local", "cpu"], "min_keywords": 1 },
+    { "id": "qa05", "question": "How does the team deploy to production?", "expected_keywords": ["github actions", "github", "merge"], "min_keywords": 1 },
+    { "id": "qa06", "question": "What is the default API port?", "expected_keywords": ["3838"], "min_keywords": 1 },
+    { "id": "qa07", "question": "What improved after migrating the build tooling to Vite?", "expected_keywords": ["startup", "start", "dev", "seconds", "faster"], "min_keywords": 1 },
+    { "id": "qa08", "question": "Where are application secrets stored?", "expected_keywords": ["secrets manager", "aws", "secrets"], "min_keywords": 1 },
+    { "id": "qa09", "question": "What is the API rate limit per key?", "expected_keywords": ["100", "minute"], "min_keywords": 1 },
+    { "id": "qa10", "question": "What testing framework did the team standardize on?", "expected_keywords": ["vitest"], "min_keywords": 1 }
+  ]
+}
