@@ -6,6 +6,8 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-06-30
+
 Tunes the optional local-LLM layer for **small models**: its two jobs (extraction and contradiction
 confirmation) are *classification*, where constrained decoding + thinking-off make a small model
 fast, cool, and reliable. All behind `isLLMEnabled` — the disabled default path stays byte-identical
@@ -25,13 +27,22 @@ fast, cool, and reliable. All behind `isLLMEnabled` — the disabled default pat
   keyword list; deliberately not from the bench fixture) lift small-model entity accuracy.
 - **Recommended model `henrybarefoot1987/engram-extract`** — `models/engram-extract.Modelfile` (Apache-2.0 Qwen base,
   extraction rubric + few-shot baked in, `temperature 0`, thinking-off) plus
-  `docs/llm/recommended-model.md`. Surfaced as a recommendation (not a lock-in) in the README and the
-  desktop AI-Enhancement model field. Publishing to the Ollama library is a documented manual step.
+  `docs/llm/recommended-model.md`. Published to the Ollama library and pullable with
+  `ollama pull henrybarefoot1987/engram-extract`. Surfaced as a recommendation (not a lock-in) in the
+  README and the desktop AI-Enhancement model field.
 - **Bench upgrades.** `bench/extraction.mjs` gains a `--models` smallest-first **sweep** that names
-  the smallest model beating rules on entity match (≥5 pts); `bench/e2e-ollama.mjs` gains
-  `--judge-model` (grade with a separate model) and `--think`. Both Ollama benches default to
+  the smallest model beating rules on entity match (≥5 pts) without regressing category; `bench/e2e-ollama.mjs`
+  gains `--judge-model` (grade with a separate model) and `--think`. Both Ollama benches default to
   thinking-off and now **fail loud** on unknown flags, stray positionals, and a boolean flag that
   swallowed a value (e.g. `--judge qwen3.5:9b`), which previously masked a model swap.
+
+### Changed
+
+- **Recommended default model is now `henrybarefoot1987/engram-extract`** (qwen3:1.7b base) instead of
+  the old `llama3.2:3b` suggestion — better entity extraction (~+50 pts vs rules on the extraction
+  benchmark, vs ~+44 pts for llama3.2:3b), faster, and smaller. The desktop AI-Enhancement default
+  model and "pull it first" helper now point at it. The layer still defaults to **off**; this only
+  changes the prefilled model when a user enables it.
 
 ## [1.8.0] - 2026-06-30
 

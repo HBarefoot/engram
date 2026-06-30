@@ -32,7 +32,7 @@ const DEFAULT_LLM: LlmForm = {
   enabled: false,
   provider: "ollama",
   endpoint: "http://localhost:11434",
-  model: "llama3.2:3b",
+  model: "henrybarefoot1987/engram-extract",
 };
 
 interface LlmLiveStatus {
@@ -845,8 +845,8 @@ export default function Preferences() {
                       style={{ color: "rgba(var(--text-secondary), 1)" }}
                     >
                       We recommend <span className="font-mono">henrybarefoot1987/engram-extract</span> (small + constrained for
-                      classification); any Ollama or OpenAI-compatible model also works. For a plain Ollama model,
-                      pull it first: <span className="font-mono">ollama pull llama3.2:3b</span>
+                      classification); any Ollama or OpenAI-compatible model also works. Pull it first:
+                      <span className="font-mono"> ollama pull henrybarefoot1987/engram-extract</span>
                     </p>
                   </div>
 
