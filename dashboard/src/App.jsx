@@ -136,6 +136,16 @@ function App() {
             </div>
           ))}
           <div className="spacer" />
+          <a
+            className="nav-item"
+            href="https://github.com/HBarefoot/engram"
+            target="_blank"
+            rel="noreferrer"
+            title="Star Engram on GitHub"
+          >
+            <span aria-hidden="true">⭐</span>
+            <span>Star on GitHub</span>
+          </a>
           <div className="sidebar__foot">SQLite for agent memory · local-first</div>
         </nav>
 
