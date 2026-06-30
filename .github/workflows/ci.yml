@@ -54,9 +54,16 @@ jobs:
 
       # Embedding-dependent suites download Xenova/all-MiniLM-L6-v2 (~23 MB) from
       # HuggingFace. Cache it + warm it (with retry) so a transient HF outage
-      # doesn't fail unrelated PRs. TRANSFORMERS_CACHE must match the cached path
-      # and is read by src/embed/index.js seedModelCache, which copies the model
-      # into each test's temp dir (so tests run offline on a cache hit).
+      # doesn't fail unrelated PRs.
+      #
+      # @xenova/transformers resolves its cache from env.cacheDir (it ignores the
+      # TRANSFORMERS_CACHE env var), so the warm-up sets env.cacheDir =
+      # ~/.cache/huggingface and the model lands at
+      # ~/.cache/huggingface/Xenova/all-MiniLM-L6-v2. The tests read that path
+      # because src/embed/index.js getKnownModelSources includes
+      # process.env.TRANSFORMERS_CACHE/Xenova/... — so we ALSO export
+      # TRANSFORMERS_CACHE=~/.cache/huggingface for the test step, and
+      # seedModelCache copies the model into each test's temp dir (offline).
       - name: Point the embedding cache at ~/.cache/huggingface
         run: echo "TRANSFORMERS_CACHE=$HOME/.cache/huggingface" >> "$GITHUB_ENV"
 
@@ -64,12 +71,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.cache/huggingface
-          key: hf-minilm-all-MiniLM-L6-v2-v1
+          key: hf-minilm-all-MiniLM-L6-v2-v2
 
       - name: Warm embedding model (downloads once on cache miss; retries on transient HF errors)
         run: |
           for attempt in 1 2 3; do
-            if node -e "import('./src/embed/index.js').then(m => m.generateEmbedding('warm-up', process.env.TRANSFORMERS_CACHE)).then(() => console.log('embedding model ready')).catch(e => { console.error('warm-up failed:', e.message); process.exit(1); })"; then
+            if node -e "import('@xenova/transformers').then(async ({ env, pipeline }) => { env.cacheDir = process.env.TRANSFORMERS_CACHE; const p = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2', { quantized: true }); await p('warm-up', { pooling: 'mean', normalize: true }); console.log('embedding model ready'); }).catch(e => { console.error('warm-up failed:', e.message); process.exit(1); })"; then
               exit 0
             fi
             if [ "$attempt" -lt 3 ]; then
