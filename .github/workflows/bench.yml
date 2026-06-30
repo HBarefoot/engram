@@ -1,0 +1,50 @@
+name: Benchmarks
+
+# Runs the fully-local operational + retrieval benchmarks on PRs and pushes to
+# main. The retrieval benchmark gates the build: if recall/MRR regress below the
+# thresholds below, the job fails. The e2e (Ollama) benchmark is NOT run in CI —
+# there is no local LLM on the runner — it is for local use only.
+
+on:
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'bench/**'
+      - 'package.json'
+      - '.github/workflows/bench.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'bench/**'
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # First embedding triggers a one-time model download from the HF hub
+      # (allowed network in CI). After this the run is effectively local.
+      - name: Operational benchmark (small)
+        run: node bench/operational.mjs --seed 200 --queries 50
+
+      - name: Retrieval benchmark (gates on regression)
+        run: node bench/retrieval.mjs --k 5 --min-mrr 0.70 --min-recall 0.80
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bench-results
+          path: bench/results/*.json
+          if-no-files-found: ignore

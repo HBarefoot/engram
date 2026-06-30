@@ -60,3 +60,6 @@ temp/
 # Internal build docs
 engram-build-prompt.md
 *.tgz
+
+# Benchmark result artifacts (keep the dir via .gitkeep)
+bench/results/*.json
