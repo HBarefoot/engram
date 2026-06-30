@@ -288,7 +288,46 @@ Defaults work out of the box. To customize:
 }
 ```
 
-An `llm.*` block is reserved for opt-in Layer 1 LLM enhancement (Ollama, LM Studio, OpenAI-compatible endpoints) — unused by the default zero-config path.
+The `llm.*` block powers the optional local AI enhancement below. It is **off by default**
+(`llm.provider: null`); the zero-config path uses rule-based extraction and makes no LLM calls.
+
+---
+
+## Optional: local AI enhancement (Ollama)
+
+Engram works fully offline with zero AI dependencies. If you want a little more accuracy and
+already run a local model, you can **optionally** turn on "Layer 1" — and it stays 100% on your
+machine.
+
+- **Free, opt-in, off by default.** Nothing changes unless you enable it.
+- **Local-first.** Uses your own [Ollama](https://ollama.com) (default) or any OpenAI-compatible
+  local server (LM Studio, llama.cpp). No cloud, no API key, no telemetry — **your memory content
+  never leaves your device.**
+- **Graceful.** Every call has a timeout and falls back to the built-in rule-based path if the
+  model is slow, unreachable, or returns junk. Engram never crashes because a model is down.
+
+What it improves when enabled: sharper `category`/`entity`/`confidence` on new memories, and an
+LLM confirmation step that reduces false-positive contradiction flags.
+
+**Enable it (desktop app):** Preferences → **AI Enhancement** → toggle on, pick a model, **Test
+connection**, **Save**.
+
+**Enable it (config file)** — `~/.engram/config.json`:
+
+```json
+{
+  "llm": {
+    "provider": "ollama",
+    "endpoint": "http://localhost:11434",
+    "model": "llama3.2:3b",
+    "apiKey": null
+  }
+}
+```
+
+First: `ollama pull llama3.2:3b`. Set `"provider": null` to turn it back off (the default).
+For an OpenAI-compatible local server, use `"provider": "openai-compatible"` and point `endpoint`
+at it (e.g. `http://localhost:1234`); `apiKey` is sent only if set.
 
 ---
 

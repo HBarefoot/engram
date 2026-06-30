@@ -8,7 +8,7 @@ import { initDatabase, createMemory, getMemory, deleteMemory, listMemories, getS
 import { recallMemories, formatRecallResults } from '../src/memory/recall.js';
 import { consolidate, getConflicts } from '../src/memory/consolidate.js';
 import { validateContent } from '../src/extract/secrets.js';
-import { extractMemory } from '../src/extract/rules.js';
+import { extractMemoryLLM } from '../src/extract/llm.js';
 import { exportToStatic } from '../src/export/static.js';
 import { shouldDefaultToMcp } from '../src/utils/mcp-default.js';
 import * as logger from '../src/utils/logger.js';
@@ -138,7 +138,7 @@ program
       };
 
       if (!options.entity) {
-        const extracted = extractMemory(content, { source: 'cli', namespace: options.namespace });
+        const extracted = await extractMemoryLLM(content, { source: 'cli', namespace: options.namespace }, config);
         memoryData.entity = extracted.entity;
       }
 
@@ -468,7 +468,8 @@ program
         detectDuplicates: options.duplicates !== false,
         detectContradictions: options.contradictions !== false,
         applyDecay: options.decay !== false,
-        cleanupStale: options.cleanupStale === true
+        cleanupStale: options.cleanupStale === true,
+        config
       });
 
       spin.succeed('Consolidation complete');

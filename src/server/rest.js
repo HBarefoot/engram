@@ -4,14 +4,15 @@ import fs from 'fs';
 import net from 'net';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { loadConfig, getDatabasePath, getModelsPath } from '../config/index.js';
+import { loadConfig, saveConfig, getDatabasePath, getModelsPath } from '../config/index.js';
 import { initDatabase, createMemory, getMemory, deleteMemory, listMemories, getStats, listContradictions, resolveContradiction, countUnresolvedContradictions, migrateTagConflicts } from '../memory/store.js';
 import { recallMemories } from '../memory/recall.js';
 import { consolidate, getConflicts, detectContradictionsForMemory } from '../memory/consolidate.js';
 import { getOverview, getStaleMemories, getNeverRecalled, getDuplicateClusters, getTrends } from '../memory/analytics.js';
 import { calculateHealthScore } from '../memory/health.js';
 import { validateContent } from '../extract/secrets.js';
-import { extractMemory } from '../extract/rules.js';
+import { extractMemoryLLM } from '../extract/llm.js';
+import { testLLM } from '../llm/index.js';
 import { exportToStatic } from '../export/static.js';
 import * as logger from '../utils/logger.js';
 
@@ -193,10 +194,11 @@ export function createRESTServer(config) {
       };
 
       if (!entity || !category) {
-        const extracted = extractMemory(validation.content, {
-          source: 'api',
-          namespace: namespace || 'default'
-        });
+        const extracted = await extractMemoryLLM(
+          validation.content,
+          { source: 'api', namespace: namespace || 'default' },
+          config
+        );
 
         if (!entity) {
           memoryData.entity = extracted.entity;
@@ -222,7 +224,7 @@ export function createRESTServer(config) {
 
       // Proactive contradiction detection (fire-and-forget)
       setImmediate(() => {
-        detectContradictionsForMemory(db, memory).catch(err => {
+        detectContradictionsForMemory(db, memory, config).catch(err => {
           logger.warn('Proactive contradiction detection failed', { error: err.message });
         });
       });
@@ -428,6 +430,7 @@ export function createRESTServer(config) {
         detectContradictions,
         applyDecay,
         cleanupStale,
+        config,
         ...(duplicateThreshold !== undefined && duplicateThreshold !== null && { duplicateThreshold })
       });
 
@@ -447,6 +450,93 @@ export function createRESTServer(config) {
       logger.error('Consolidate error', { error: error.message });
       reply.code(500);
       return { error: error.message };
+    }
+  });
+
+  // --- Optional LLM layer (Layer 1) config ---------------------------------
+  const LLM_PROVIDERS = [null, 'ollama', 'openai-compatible'];
+
+  // Current llm block, with apiKey redacted to a boolean.
+  fastify.get('/api/config/llm', async () => {
+    const llm = config.llm || {};
+    return {
+      provider: llm.provider ?? null,
+      endpoint: llm.endpoint ?? null,
+      model: llm.model ?? null,
+      timeoutMs: llm.timeoutMs ?? null,
+      hasApiKey: !!llm.apiKey
+    };
+  });
+
+  // Persist the llm block. apiKey is only updated when explicitly provided;
+  // omit it to keep the stored key, send "" to clear it. Never echoed back.
+  fastify.put('/api/config/llm', async (request, reply) => {
+    try {
+      const body = request.body || {};
+      const provider = body.provider ?? null;
+      if (!LLM_PROVIDERS.includes(provider)) {
+        reply.code(400);
+        return { error: `Invalid provider. Use one of: ${LLM_PROVIDERS.map(String).join(', ')}` };
+      }
+
+      const next = {
+        provider,
+        endpoint: typeof body.endpoint === 'string' && body.endpoint.trim() ? body.endpoint.trim() : null,
+        model: typeof body.model === 'string' && body.model.trim() ? body.model.trim() : null,
+        timeoutMs:
+          typeof body.timeoutMs === 'number' && body.timeoutMs > 0 ? body.timeoutMs : (config.llm?.timeoutMs ?? null),
+        // apiKey: preserve unless explicitly provided (string)
+        apiKey: typeof body.apiKey === 'string' ? (body.apiKey || null) : (config.llm?.apiKey ?? null)
+      };
+
+      config.llm = next; // update the running server immediately
+      saveConfig(config);
+
+      logger.info('LLM config updated via API', { provider: next.provider, model: next.model });
+
+      return {
+        success: true,
+        restartRecommended: true,
+        llm: {
+          provider: next.provider,
+          endpoint: next.endpoint,
+          model: next.model,
+          timeoutMs: next.timeoutMs,
+          hasApiKey: !!next.apiKey
+        }
+      };
+    } catch (error) {
+      logger.error('Update LLM config error', { error: error.message });
+      reply.code(500);
+      return { error: error.message };
+    }
+  });
+
+  // Test connection against POSTED settings (so the user can test before save).
+  // Falls back to the stored apiKey when one isn't posted.
+  fastify.post('/api/llm/test', async (request, reply) => {
+    try {
+      const body = request.body || {};
+      const provider = body.provider ?? config.llm?.provider ?? null;
+      if (!LLM_PROVIDERS.includes(provider) || !provider) {
+        reply.code(400);
+        return { ok: false, error: 'No valid provider supplied' };
+      }
+      const testConfig = {
+        llm: {
+          provider,
+          endpoint: body.endpoint ?? config.llm?.endpoint ?? null,
+          model: body.model ?? config.llm?.model ?? null,
+          timeoutMs: typeof body.timeoutMs === 'number' ? body.timeoutMs : config.llm?.timeoutMs,
+          apiKey: typeof body.apiKey === 'string' ? body.apiKey : (config.llm?.apiKey ?? null)
+        }
+      };
+      const result = await testLLM(testConfig);
+      return result;
+    } catch (error) {
+      logger.error('LLM test error', { error: error.message });
+      reply.code(500);
+      return { ok: false, error: error.message };
     }
   });
 

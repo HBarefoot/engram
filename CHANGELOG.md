@@ -6,6 +6,23 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+### Added
+
+- **Optional local AI enhancement (Layer 1).** The previously-dormant `llm` config block is
+  now consumed by an opt-in, **off-by-default**, 100%-local LLM layer (`src/llm/index.js`).
+  When enabled it uses your own local model — Ollama (default, `http://localhost:11434`) or any
+  OpenAI-compatible local endpoint — to (a) sharpen extraction (`category`/`entity`/`confidence`
+  via `extractMemoryLLM`) and (b) confirm heuristic contradictions to cut false positives. Every
+  call has a timeout and falls back to the existing rule-based path on any failure, so behavior is
+  **identical to today when disabled** (no network calls, no added latency). No memory content
+  leaves the machine; no cloud, no API key required for Ollama.
+- **Config REST surface for the LLM layer:** `GET /api/config/llm` (apiKey redacted to
+  `hasApiKey`), `PUT /api/config/llm` (validates + persists via `saveConfig`), and
+  `POST /api/llm/test` (tests posted settings before saving). (`src/server/rest.js`.)
+- **Desktop "AI Enhancement (optional)" preferences section** — enable toggle, provider/endpoint/
+  model fields, a "Test connection" button, and Save (persists via REST, then restarts the
+  sidecar). Off by default. (`desktop/src/pages/Preferences.tsx`.)
+
 ## [1.6.6] - 2026-06-27
 
 ### Changed
