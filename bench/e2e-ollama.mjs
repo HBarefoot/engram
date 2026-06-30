@@ -98,11 +98,18 @@ function keywordScore(answer, expected, minK) {
 
 async function judge(model, question, answer, expected) {
   const sys =
-    'You are a strict grader. Reply with exactly one word: YES if the answer is correct, or NO if it is wrong or evasive.';
-  const user = `Question: ${question}\nExpected facts (any of): ${expected.join(', ')}\nAnswer: ${answer}\nIs the answer correct?`;
+    'You grade short answers against expected facts. An answer is CORRECT if it states, or is clearly consistent with, ANY ONE of the expected facts. ' +
+    'Respond with ONLY a JSON object and nothing else: {"correct": true} or {"correct": false}.';
+  const user = `Question: ${question}\nExpected facts (any one is sufficient): ${expected.join(' | ')}\nAnswer: ${answer}`;
   try {
     const { text } = await chat(model, sys, user);
-    return /\byes\b/i.test(text);
+    const j = text.match(/"correct"\s*:\s*(true|false)/i);
+    if (j) return j[1].toLowerCase() === 'true';
+    const t = text.trim().toLowerCase();
+    if (/^\W*(yes|correct|true)\b/.test(t)) return true;
+    if (/^\W*(no|incorrect|false|wrong)\b/.test(t)) return false;
+    // ambiguous: accept only if a positive token is present and no negative token
+    return /\b(yes|correct|true)\b/.test(t) && !/\b(no|incorrect|false|wrong)\b/.test(t);
   } catch {
     return null;
   }
@@ -163,6 +170,22 @@ async function main() {
     const system =
       'You answer the user using ONLY the provided context memories. ' +
       'Be concise. If the answer is not in the context, say you do not know.';
+
+    // Rubber-stamp guard: a judge that passes everything is useless. Feed it a
+    // deliberately wrong answer and confirm it returns NO before trusting it.
+    if (USE_JUDGE) {
+      const probe = await judge(
+        MODEL,
+        'What database is used in production?',
+        'It uses MySQL.',
+        ['PostgreSQL']
+      );
+      const ok = probe === false;
+      console.log(`Judge self-check (wrong answer → NO): ${ok ? 'PASS' : `FAIL (returned ${probe})`}`);
+      if (!ok) {
+        console.log('::warning:: Judge failed the rubber-stamp guard — judge accuracy below is unreliable.');
+      }
+    }
 
     const rows = [];
     const detail = [];

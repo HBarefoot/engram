@@ -1,11 +1,12 @@
 # Engram Benchmark Suite
 
-Reproducible, **fully-local, offline** benchmarks for Engram. There are three:
+Reproducible, **fully-local, offline** benchmarks for Engram. There are four:
 
 | Benchmark | File | What it measures | Needs |
 | --- | --- | --- | --- |
 | **Operational** | `operational.mjs` | Cold start, install footprint, recall latency, idle memory, offline guarantee | nothing (local model already cached after first Engram use) |
 | **Retrieval quality** | `retrieval.mjs` | recall@k / precision@k / MRR / nDCG@k of the hybrid scorer on a labeled set | nothing |
+| **Extraction quality** | `extraction.mjs` | category accuracy / entity match / confidence calibration — rule-based vs optional local LLM | rule-based: nothing; LLM column: a local Ollama model |
 | **End-to-end** | `e2e-ollama.mjs` | Answer accuracy when a **local** LLM consumes Engram's recalled context | a local [Ollama](https://ollama.com) model |
 
 The headline story is **operational + retrieval**. The e2e benchmark exists so the
@@ -34,11 +35,13 @@ npm run bench
 # individually
 npm run bench:ops          # operational
 npm run bench:retrieval    # retrieval quality
+npm run bench:extraction   # extraction quality (rule vs LLM; LLM column needs local Ollama)
 npm run bench:e2e          # end-to-end (needs local Ollama; skips cleanly if absent)
 
 # pass flags through npm with `--`
 npm run bench:ops -- --seed 1000 --queries 200
 npm run bench:retrieval -- --k 5 --min-mrr 0.70 --min-recall 0.80
+npm run bench:extraction -- --model llama3.2:3b
 npm run bench:e2e -- --model llama3.2:3b --judge
 ```
 
@@ -85,10 +88,45 @@ For accurate idle-RSS, run operational with `node --expose-gc bench/operational.
 - **MRR:** mean reciprocal rank of the first relevant hit (within top *k*).
 - **nDCG@k:** rank-discounted gain normalized by the ideal ranking.
 
+**Extraction quality** (rule-based vs optional local LLM — see the dedicated section below)
+- **Category accuracy:** exact match of the extracted category vs `expected_category`.
+- **Entity match rate:** normalized match of the extracted entity against any `acceptable_entities`.
+- **Confidence in band:** share of items whose returned confidence falls inside `confidence_band`.
+- **Mean latency / item:** per-item extraction time per mode (the LLM path is far slower).
+
 **End-to-end**
 - **Keyword accuracy:** fraction of answers containing the expected fact keywords.
 - **Judge accuracy:** (with `--judge`) fraction the local model grades correct.
 - **Mean answer latency:** Ollama chat latency per question (`temperature: 0`, fixed seed).
+
+## Extraction-quality benchmark
+
+**What it measures.** How well raw text becomes the right `category`, `entity`, and
+`confidence` — comparing the default rule-based extractor (`extractMemory`, `src/extract/rules.js`)
+against the optional local-LLM extractor (`extractMemoryLLM`, `src/extract/llm.js`). It is the
+honest basis for any "with local AI it's more accurate" claim.
+
+**Why retrieval can't measure this.** `retrieval.mjs` seeds the store with the fixture's *gold*
+`category`/`entity` and scores the recall ranker — which the LLM layer never touches. So retrieval
+correctly shows **no delta** with Ollama on. The LLM layer only changes *extraction*, so it needs
+its own benchmark.
+
+**Entity-matching rule.** Both the extracted entity and each `acceptable_entities` alias are
+normalized to lowercase with all non-alphanumerics stripped (`next.js` → `nextjs`). A match counts
+when the normalized strings are equal, **or** one contains the other and the shorter side is ≥ 3
+chars (so `stripe billing` ~ `stripe`, without `go` matching `google`). A null/empty entity never
+matches.
+
+**Run it.**
+```bash
+npm run bench:extraction                          # rule-based always; LLM column if Ollama+model present
+npm run bench:extraction -- --model llama3.2:3b   # pin a model (default llama3.2:3b)
+```
+Rule-based scoring needs nothing. The LLM column needs a local Ollama with the pinned model
+(`ollama pull llama3.2:3b`); if it's absent the LLM column is skipped with guidance and the
+rule-based numbers still print. `:cloud` models are refused (off-machine). Not part of the CI
+`bench.yml` gate — it's local and on-demand. Latency is **hardware/model-dependent**; the result
+JSON records the machine and model.
 
 ## Fixture schemas
 
@@ -132,6 +170,25 @@ ids and queries that reference them.
 ```
 The retrieval-set memories are the corpus; each question recalls top-k context, which is fed
 to the local model.
+
+### `fixtures/extraction-set.json`
+```jsonc
+{
+  "items": [
+    {
+      "id": "x01",
+      "content": "the raw memory text an agent would store",
+      "expected_category": "preference|fact|pattern|decision|outcome",
+      "acceptable_entities": ["primary", "synonym/alias"],  // any normalized match counts
+      "confidence_band": [0.6, 1.0]                          // optional plausible min/max
+    }
+  ]
+}
+```
+Designed to expose where rules are weak: items with an **implicit** category (no trigger keyword
+from `rules.js`'s signal lists, which the rule extractor defaults to `fact`), entities **not** in
+`rules.js`'s `TECH_KEYWORDS` (product/SaaS names), a few genuinely ambiguous items (intended label
+noted in the fixture's `_schema.ambiguous`), and a spread across all five categories.
 
 ## Reproducibility notes
 
