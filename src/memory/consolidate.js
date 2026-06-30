@@ -1,7 +1,37 @@
 import { getMemoriesWithEmbeddings, listMemories, updateMemory, deleteMemory, createContradiction, contradictionExists } from './store.js';
 import { cosineSimilarity } from '../embed/index.js';
 import { SIMILARITY_THRESHOLDS } from './constants.js';
+import { isLLMEnabled, llmComplete } from '../llm/index.js';
 import * as logger from '../utils/logger.js';
+
+/**
+ * When the optional LLM layer is enabled, confirm whether a heuristic-flagged
+ * pair is *really* a contradiction. Acts only as a false-positive filter on top
+ * of the heuristic: returns false ONLY when the model clearly says "no". Returns
+ * true on confirm OR on any failure/unknown, so contradictions are never lost
+ * when the model is unreachable (graceful degradation).
+ * @returns {Promise<boolean>} false = drop (not a real contradiction); true = keep
+ */
+async function llmConfirmsContradiction(config, contentA, contentB) {
+  if (!isLLMEnabled(config)) return true;
+  try {
+    const out = await llmComplete(config, {
+      system:
+        'You judge whether two memories about the same topic actually contradict ' +
+        'each other. Respond with ONLY JSON.',
+      prompt:
+        `Memory A: """${contentA}"""\nMemory B: """${contentB}"""\n\n` +
+        `Do these directly contradict (cannot both be true at the same time)? ` +
+        `Return {"contradicts": true or false}.`,
+      json: true,
+      timeoutMs: 10000
+    });
+    if (!out || typeof out.contradicts !== 'boolean') return true; // unknown -> keep
+    return out.contradicts;
+  } catch {
+    return true; // never lose a heuristic hit on failure
+  }
+}
 
 /**
  * Run full consolidation process
@@ -20,7 +50,8 @@ export async function consolidate(db, options = {}) {
     detectContradictions = true,
     applyDecay = true,
     cleanupStale = false,
-    duplicateThreshold = SIMILARITY_THRESHOLDS.MERGE
+    duplicateThreshold = SIMILARITY_THRESHOLDS.MERGE,
+    config = null
   } = options;
 
   logger.info('Starting memory consolidation', options);
@@ -45,7 +76,7 @@ export async function consolidate(db, options = {}) {
     // Step 2: Detect contradictions
     if (detectContradictions) {
       logger.debug('Detecting contradictions...');
-      const newContradictions = await findContradictions(db);
+      const newContradictions = await findContradictions(db, config);
       results.contradictionsDetected = newContradictions.length;
       logger.info('Contradictions detected', { count: results.contradictionsDetected });
     }
@@ -180,7 +211,7 @@ async function mergeDuplicates(db, duplicates) {
  * @param {Database} db - SQLite database instance
  * @returns {Promise<Array>} Array of newly created contradiction records
  */
-async function findContradictions(db) {
+async function findContradictions(db, config = null) {
   const memories = getMemoriesWithEmbeddings(db);
   const newContradictions = [];
 
@@ -211,6 +242,10 @@ async function findContradictions(db) {
 
         const result = seemsContradictory(memA.content, memB.content);
         if (result.isContradiction && !contradictionExists(db, memA.id, memB.id)) {
+          // Optional LLM confirmation filters heuristic false positives.
+          if (!(await llmConfirmsContradiction(config, memA.content, memB.content))) {
+            continue;
+          }
           try {
             const record = createContradiction(db, {
               memory1_id: memA.id,
@@ -325,7 +360,7 @@ function simpleSimilarity(a, b) {
  * @param {Object} newMemory - The newly created memory object
  * @returns {Promise<Array>} Array of new contradiction records
  */
-export async function detectContradictionsForMemory(db, newMemory) {
+export async function detectContradictionsForMemory(db, newMemory, config = null) {
   if (!newMemory.entity) return [];
 
   // Get memories with the same entity and namespace
@@ -343,6 +378,10 @@ export async function detectContradictionsForMemory(db, newMemory) {
   for (const candidate of candidates) {
     const result = seemsContradictory(newMemory.content, candidate.content);
     if (result.isContradiction && !contradictionExists(db, newMemory.id, candidate.id)) {
+      // Optional LLM confirmation filters heuristic false positives.
+      if (!(await llmConfirmsContradiction(config, newMemory.content, candidate.content))) {
+        continue;
+      }
       try {
         const record = createContradiction(db, {
           memory1_id: candidate.id,

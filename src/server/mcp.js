@@ -11,7 +11,7 @@ import { recallMemories, formatRecallResults } from '../memory/recall.js';
 import { recordFeedback, getFeedbackStats } from '../memory/feedback.js';
 import { generateContext } from '../memory/context.js';
 import { validateContent } from '../extract/secrets.js';
-import { extractMemory } from '../extract/rules.js';
+import { extractMemoryLLM } from '../extract/llm.js';
 import * as logger from '../utils/logger.js';
 
 /**
@@ -328,12 +328,14 @@ export class EngramMCPServer {
       source: 'mcp'
     };
 
-    // Extract category/entity if not provided
+    // Extract category/entity if not provided. Uses the optional local LLM when
+    // enabled (config.llm), otherwise falls back to rule-based extraction.
     if (!entity || !category) {
-      const extracted = extractMemory(validation.content, {
-        source: 'mcp',
-        namespace: namespace || 'default'
-      });
+      const extracted = await extractMemoryLLM(
+        validation.content,
+        { source: 'mcp', namespace: namespace || 'default' },
+        this.config
+      );
 
       if (!entity) {
         memoryData.entity = extracted.entity;

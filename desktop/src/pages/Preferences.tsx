@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { invoke } from "@tauri-apps/api/core";
 import { getApiBase, getPort } from "../lib/api";
 
-type Tab = "general" | "agents" | "shortcuts" | "storage" | "advanced";
+type Tab = "general" | "agents" | "ai" | "shortcuts" | "storage" | "advanced";
 
 interface DetectedAgent {
   id: string;
@@ -21,9 +21,24 @@ interface Prefs {
   logLevel: string;
 }
 
+interface LlmForm {
+  enabled: boolean;
+  provider: "ollama" | "openai-compatible";
+  endpoint: string;
+  model: string;
+}
+
+const DEFAULT_LLM: LlmForm = {
+  enabled: false,
+  provider: "ollama",
+  endpoint: "http://localhost:11434",
+  model: "llama3.2:3b",
+};
+
 const TABS: { id: Tab; label: string }[] = [
   { id: "general", label: "General" },
   { id: "agents", label: "Agents" },
+  { id: "ai", label: "AI Enhancement" },
   { id: "shortcuts", label: "Shortcuts" },
   { id: "storage", label: "Storage" },
   { id: "advanced", label: "Advanced" },
@@ -53,6 +68,10 @@ export default function Preferences() {
   const [agents, setAgents] = useState<DetectedAgent[]>([]);
   const [agentsLoading, setAgentsLoading] = useState(false);
   const [connectingAgent, setConnectingAgent] = useState<string | null>(null);
+  const [llm, setLlm] = useState<LlmForm>(DEFAULT_LLM);
+  const [llmStatus, setLlmStatus] = useState<string | null>(null);
+  const [llmTesting, setLlmTesting] = useState(false);
+  const [llmSaving, setLlmSaving] = useState(false);
   const navigate = useNavigate();
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -71,7 +90,83 @@ export default function Preferences() {
     if (activeTab === "agents") {
       loadAgents();
     }
+    if (activeTab === "ai") {
+      loadLlmConfig();
+    }
   }, [activeTab]);
+
+  async function loadLlmConfig() {
+    try {
+      const res = await fetch(`${getApiBase()}/config/llm`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setLlm({
+        enabled: !!data.provider,
+        provider: data.provider === "openai-compatible" ? "openai-compatible" : "ollama",
+        endpoint: data.endpoint || DEFAULT_LLM.endpoint,
+        model: data.model || DEFAULT_LLM.model,
+      });
+    } catch {
+      // Sidecar not reachable — keep defaults
+    }
+  }
+
+  async function testLlmConnection() {
+    setLlmTesting(true);
+    setLlmStatus(null);
+    try {
+      const res = await fetch(`${getApiBase()}/llm/test`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ provider: llm.provider, endpoint: llm.endpoint, model: llm.model }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setLlmStatus(`✓ Connected to ${data.model || llm.model} (${data.latencyMs} ms)`);
+      } else {
+        setLlmStatus(`✗ ${data.error || "Connection failed"}`);
+      }
+    } catch (e) {
+      setLlmStatus(`✗ ${e instanceof Error ? e.message : "Connection failed"}`);
+    } finally {
+      setLlmTesting(false);
+    }
+  }
+
+  async function saveLlmConfig() {
+    setLlmSaving(true);
+    setLlmStatus(null);
+    try {
+      const body = llm.enabled
+        ? { provider: llm.provider, endpoint: llm.endpoint, model: llm.model }
+        : { provider: null };
+      const res = await fetch(`${getApiBase()}/config/llm`, {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        setLlmStatus(`✗ ${err.error || "Failed to save"}`);
+        return;
+      }
+      // Restart the sidecar so the layer takes effect.
+      try {
+        await invoke("restart_sidecar");
+      } catch {
+        // Tauri not available (e.g. dev browser) — config still saved
+      }
+      setLlmStatus(
+        llm.enabled
+          ? "✓ Saved. AI enhancement enabled — sidecar restarted."
+          : "✓ Saved. AI enhancement disabled — using rule-based extraction."
+      );
+    } catch (e) {
+      setLlmStatus(`✗ ${e instanceof Error ? e.message : "Failed to save"}`);
+    } finally {
+      setLlmSaving(false);
+    }
+  }
 
   async function loadPreferences() {
     try {
@@ -558,6 +653,127 @@ export default function Preferences() {
                   <option value="debug">Debug</option>
                 </select>
               </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "ai" && (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-xl font-bold">AI Enhancement (optional)</h2>
+              <p
+                className="mt-1 text-sm"
+                style={{ color: "rgba(var(--text-secondary), 1)" }}
+              >
+                Optional. Runs entirely on your machine via your own local model (Ollama).
+                Free, off by default, and no memory data ever leaves your device. Disable to
+                use Engram's built-in rule-based extraction.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <label className="flex items-center justify-between p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                <div>
+                  <p className="text-sm font-medium">Enable AI enhancement</p>
+                  <p
+                    className="text-xs mt-0.5"
+                    style={{ color: "rgba(var(--text-secondary), 1)" }}
+                  >
+                    Use a local model to sharpen categorization and cut false-positive
+                    contradiction flags. Falls back to rules if the model is unreachable.
+                  </p>
+                </div>
+                <button
+                  role="switch"
+                  aria-checked={llm.enabled}
+                  onClick={() => setLlm((p) => ({ ...p, enabled: !p.enabled }))}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    llm.enabled ? "bg-indigo-600" : "bg-gray-300 dark:bg-gray-600"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      llm.enabled ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </label>
+
+              {llm.enabled && (
+                <>
+                  <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <label className="text-sm font-medium">Provider</label>
+                    <select
+                      value={llm.provider}
+                      onChange={(e) =>
+                        setLlm((p) => ({ ...p, provider: e.target.value as LlmForm["provider"] }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      style={{ color: "rgba(var(--text-primary), 1)" }}
+                    >
+                      <option value="ollama">Ollama (local)</option>
+                      <option value="openai-compatible">OpenAI-compatible (local)</option>
+                    </select>
+                  </div>
+
+                  <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <label className="text-sm font-medium">Endpoint</label>
+                    <input
+                      type="text"
+                      value={llm.endpoint}
+                      onChange={(e) => setLlm((p) => ({ ...p, endpoint: e.target.value }))}
+                      placeholder="http://localhost:11434"
+                      className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      style={{ color: "rgba(var(--text-primary), 1)" }}
+                    />
+                  </div>
+
+                  <div className="p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <label className="text-sm font-medium">Model</label>
+                    <input
+                      type="text"
+                      value={llm.model}
+                      onChange={(e) => setLlm((p) => ({ ...p, model: e.target.value }))}
+                      placeholder="llama3.2:3b"
+                      className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      style={{ color: "rgba(var(--text-primary), 1)" }}
+                    />
+                    <p
+                      className="text-xs mt-1"
+                      style={{ color: "rgba(var(--text-secondary), 1)" }}
+                    >
+                      For Ollama, pull the model first: <span className="font-mono">ollama pull llama3.2:3b</span>
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={testLlmConnection}
+                    disabled={llmTesting}
+                    className="px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    {llmTesting ? "Testing…" : "Test connection"}
+                  </button>
+                </>
+              )}
+
+              <div>
+                <button
+                  onClick={saveLlmConfig}
+                  disabled={llmSaving}
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {llmSaving ? "Saving…" : "Save"}
+                </button>
+              </div>
+
+              {llmStatus && (
+                <p
+                  className="text-xs p-3 rounded-lg bg-gray-50 dark:bg-gray-800"
+                  style={{ color: "rgba(var(--text-secondary), 1)" }}
+                >
+                  {llmStatus}
+                </p>
+              )}
             </div>
           </div>
         )}
