@@ -4,6 +4,8 @@
 
 > Give your AI agent the memory of a colleague who's worked with you for years — without cloud, API keys, or Docker.
 
+⭐ **Useful to you? [Star it on GitHub](https://github.com/HBarefoot/engram)** — it's the simplest way to help others find Engram.
+
 [![CI](https://github.com/HBarefoot/engram/actions/workflows/ci.yml/badge.svg)](https://github.com/HBarefoot/engram/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/@hbarefoot/engram)](https://www.npmjs.com/package/@hbarefoot/engram)
 [![Website](https://img.shields.io/badge/website-engram-6d7bff)](https://next.henrybarefoot.com/engram)
@@ -17,7 +19,7 @@ npm install -g @hbarefoot/engram
 engram start
 ```
 
-<p align="center"><img src="docs/quickstart.gif" alt="Engram quickstart demo" width="900"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/HBarefoot/engram/main/docs/quickstart.gif" alt="Engram quickstart demo: install, remember two facts, recall by meaning" width="900"></p>
 
 Your AI agent now has long-term memory. Two minutes, no setup, no cloud.
 
@@ -25,6 +27,25 @@ Your AI agent now has long-term memory. Two minutes, no setup, no cloud.
 - 📴 **Offline** — local SQLite + bundled embeddings (~23 MB). No API keys, no data leaving your machine.
 - 🔌 **MCP-native** — first-class Model Context Protocol integration with Claude Desktop, Claude Code, Cursor, Windsurf, and Cline.
 - 🔐 **Safety by default** — automatic secret detection on every write. API keys, private keys, connection strings, JWTs blocked before they hit the database.
+
+---
+
+## Why local-first, in numbers
+
+Engram runs *inside* your agent's process — no service to deploy, no account, nothing leaving your machine. That design choice is measurable:
+
+| Metric | Engram | |
+|---|---|---|
+| Cold start → first recall | **~124 ms** | import → first answer, embedding-model load included |
+| Warm recall (p50) | **~4 ms** | median query latency once the model is in memory |
+| Package download | **~585 KB** | the npm package (1.3 MB unpacked) |
+| Embedding model | **~23 MB** | `all-MiniLM-L6-v2`, fetched once, cached at `~/.engram/models` |
+| External services | **0** | no database, broker, or cloud account |
+| Works offline | **✅** | zero network calls on the default path |
+
+<sub>Measured on an Apple M4 Pro over 1,000 seeded memories — reproduce with `npm run bench`. These are footprint and latency numbers, **not** an accuracy claim: Engram doesn't try to out-rank Mem0 or Zep on memory benchmarks. The point is solid recall with none of the operational surface.</sub>
+
+**Optional accuracy lift — still 100% local.** If you already run a local model, the opt-in [LLM layer](#optional-local-ai-enhancement-ollama) sharpens fact extraction: entity-extraction accuracy climbs from ~46% (rule-based) to ~96% with the recommended `henrybarefoot1987/engram-extract` model (**+50 pts**), without a single byte leaving your device.
 
 ---
 
@@ -55,7 +76,7 @@ Most agent-memory products are services you run alongside your agent — Postgre
 
 | | **Engram** | **Lodis** | **Mem0 / OpenMemory** | **Zep** | **Letta** |
 |---|---|---|---|---|---|
-| **Maturity** | v1.4.x, stable | v0.5.x, early | mature / SaaS | v0.x | v0.x |
+| **Maturity** | v1.9.x, stable | v0.5.x, early | mature / SaaS | v0.x | v0.x |
 | **Infra to operate** | None (npm package) | None (npx package) | Cloud account *or* multi-container Docker | Docker + Postgres + Graphiti | Docker + Postgres |
 | **Install footprint** | ~23 MB | ~22 MB | Hundreds of MB containers (self-hosted) | Hundreds of MB | Hundreds of MB |
 | **Works offline** | ✅ | ✅ | ❌ Cloud / ✅ if self-hosted | ❌ External embed provider | ❌ External LLM provider |
@@ -323,6 +344,10 @@ ollama create henrybarefoot1987/engram-extract -f models/engram-extract.Modelfil
 Then set the model to `henrybarefoot1987/engram-extract`. It's a recommendation, not a lock-in — **any** Ollama or
 OpenAI-compatible model still works. See [`docs/llm/recommended-model.md`](docs/llm/recommended-model.md)
 for the base model, licensing, and how to pick the smallest model that beats rules on your hardware.
+
+> **Attribution.** `henrybarefoot1987/engram-extract` is built on **Qwen3-1.7B** (© Alibaba Cloud, Apache-2.0).
+> Engram only adds the extraction prompt and the constrained-output configuration; the base model's weights,
+> license, and notice are unchanged.
 
 **Enable it (desktop app):** Preferences → **AI Enhancement** → toggle on, pick a model, **Test
 connection**, **Save**. The same tab shows a **live status badge**, **activity stats** (enhanced
