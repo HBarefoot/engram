@@ -14,6 +14,13 @@
  */
 import * as logger from '../utils/logger.js';
 import { recordCall } from './stats.js';
+import {
+  breakerOpen,
+  breakerRecordSuccess,
+  breakerRecordFailure,
+  DEFAULT_BREAKER_THRESHOLD,
+  DEFAULT_BREAKER_COOLDOWN_MS
+} from './breaker.js';
 
 /** Default request timeout (ms). Overridable via config.llm.timeoutMs. */
 const DEFAULT_TIMEOUT_MS = 20000;
@@ -69,6 +76,11 @@ export async function llmComplete(config, { system, prompt, json = false, timeou
   if (!llm || !llm.provider) return null;
   if (!prompt) return null;
 
+  // Circuit open: skip the network entirely and fall back to rules instantly.
+  if (breakerOpen()) return null;
+
+  const breakerThreshold = llm.breakerThreshold || DEFAULT_BREAKER_THRESHOLD;
+  const breakerCooldownMs = llm.breakerCooldownMs || DEFAULT_BREAKER_COOLDOWN_MS;
   const timeout = timeoutMs || llm.timeoutMs || DEFAULT_TIMEOUT_MS;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
@@ -119,7 +131,7 @@ export async function llmComplete(config, { system, prompt, json = false, timeou
 
     if (!res.ok) {
       logger.warn('LLM endpoint returned non-OK status', { status: res.status });
-      recordFailure(model, callStart, 'error', `HTTP ${res.status}`);
+      recordFailure(model, callStart, 'error', `HTTP ${res.status}`, breakerThreshold, breakerCooldownMs);
       return null;
     }
 
@@ -130,7 +142,7 @@ export async function llmComplete(config, { system, prompt, json = false, timeou
         : data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
 
     if (typeof text !== 'string' || !text.trim()) {
-      recordFailure(model, callStart, 'error', 'empty response');
+      recordFailure(model, callStart, 'error', 'empty response', breakerThreshold, breakerCooldownMs);
       return null;
     }
 
@@ -140,19 +152,22 @@ export async function llmComplete(config, { system, prompt, json = false, timeou
         parsed = JSON.parse(isolateJson(text));
       } catch {
         logger.warn('LLM returned unparseable JSON, falling back');
-        recordFailure(model, callStart, 'error', 'unparseable JSON');
+        recordFailure(model, callStart, 'error', 'unparseable JSON', breakerThreshold, breakerCooldownMs);
         return null;
       }
       recordCall({ latencyMs: Date.now() - callStart, status: 'ok', model });
+      breakerRecordSuccess();
       return parsed;
     }
     recordCall({ latencyMs: Date.now() - callStart, status: 'ok', model });
+    breakerRecordSuccess();
     return text.trim();
   } catch (error) {
-    // AbortError (timeout), connection refused, DNS, etc. — all degrade to null
+    // AbortError (timeout), connection refused, DNS, etc. — all degrade to null.
+    // Log only the error CLASS, never the message/prompt/content.
     const timedOut = error.name === 'AbortError';
-    logger.warn('LLM call failed, falling back to rule-based path', { error: error.message });
-    recordFailure(model, callStart, timedOut ? 'timeout' : 'error', error.message);
+    logger.warn('LLM call failed, falling back to rule-based path', { errorClass: error.name });
+    recordFailure(model, callStart, timedOut ? 'timeout' : 'error', error.name, breakerThreshold, breakerCooldownMs);
     return null;
   } finally {
     clearTimeout(timer);
@@ -160,13 +175,14 @@ export async function llmComplete(config, { system, prompt, json = false, timeou
 }
 
 /**
- * Record a failed LLM call (counter + lastError only). Feed events for the
- * op-level outcome (fallback) are emitted by the caller, so failures aren't
- * double-counted in the activity feed. `op` is accepted by llmComplete opts for
- * caller context but failures are summarized via counters here.
+ * Record a failed LLM call: counter + lastError (stats) AND a breaker tick.
+ * Feed events for the op-level outcome (fallback) are emitted by the caller, so
+ * failures aren't double-counted in the activity feed. `error` should be an error
+ * class/short reason, never memory content.
  */
-function recordFailure(model, callStart, status, message) {
-  recordCall({ latencyMs: Date.now() - callStart, status, model, error: message });
+function recordFailure(model, callStart, status, error, breakerThreshold, breakerCooldownMs) {
+  recordCall({ latencyMs: Date.now() - callStart, status, model, error });
+  breakerRecordFailure(breakerThreshold, breakerCooldownMs);
 }
 
 /**

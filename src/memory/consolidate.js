@@ -2,8 +2,15 @@ import { getMemoriesWithEmbeddings, listMemories, updateMemory, deleteMemory, cr
 import { cosineSimilarity } from '../embed/index.js';
 import { SIMILARITY_THRESHOLDS } from './constants.js';
 import { isLLMEnabled, llmComplete } from '../llm/index.js';
-import { recordEvent } from '../llm/stats.js';
+import { recordEvent, recordSkippedConfirmations } from '../llm/stats.js';
 import * as logger from '../utils/logger.js';
+
+// Cap LLM contradiction confirmations per consolidation run so a large store
+// can't fan out into hundreds of model calls. Overridable via
+// config.llm.maxContradictionConfirms. Beyond the cap, the heuristic hit is
+// KEPT without confirmation (never lose a hit).
+const DEFAULT_MAX_CONTRADICTION_CONFIRMS = 25;
+const CONTRADICTION_TIMEOUT_MS = 10000;
 
 /**
  * When the optional LLM layer is enabled, confirm whether a heuristic-flagged
@@ -25,7 +32,7 @@ async function llmConfirmsContradiction(config, contentA, contentB) {
         `Do these directly contradict (cannot both be true at the same time)? ` +
         `Return {"contradicts": true or false}.`,
       json: true,
-      timeoutMs: 10000
+      timeoutMs: config.llm?.timeoutMs ?? CONTRADICTION_TIMEOUT_MS
     });
     const model = config.llm.model;
     if (!out || typeof out.contradicts !== 'boolean') {
@@ -223,6 +230,11 @@ async function findContradictions(db, config = null) {
   const memories = getMemoriesWithEmbeddings(db);
   const newContradictions = [];
 
+  // Per-run LLM confirmation budget (only relevant when the layer is enabled).
+  const maxConfirms = config?.llm?.maxContradictionConfirms ?? DEFAULT_MAX_CONTRADICTION_CONFIRMS;
+  let confirmsUsed = 0;
+  let confirmsSkipped = 0;
+
   // Group memories by entity
   const byEntity = new Map();
   for (const memory of memories) {
@@ -250,9 +262,17 @@ async function findContradictions(db, config = null) {
 
         const result = seemsContradictory(memA.content, memB.content);
         if (result.isContradiction && !contradictionExists(db, memA.id, memB.id)) {
-          // Optional LLM confirmation filters heuristic false positives.
-          if (!(await llmConfirmsContradiction(config, memA.content, memB.content))) {
-            continue;
+          // Optional LLM confirmation filters heuristic false positives, capped
+          // per run. Past the cap, keep the heuristic hit without confirmation.
+          if (isLLMEnabled(config)) {
+            if (confirmsUsed < maxConfirms) {
+              confirmsUsed++;
+              if (!(await llmConfirmsContradiction(config, memA.content, memB.content))) {
+                continue;
+              }
+            } else {
+              confirmsSkipped++;
+            }
           }
           try {
             const record = createContradiction(db, {
@@ -270,6 +290,11 @@ async function findContradictions(db, config = null) {
         }
       }
     }
+  }
+
+  if (confirmsSkipped > 0) {
+    recordSkippedConfirmations(confirmsSkipped);
+    logger.info('Contradiction confirmations capped', { cap: maxConfirms, skipped: confirmsSkipped });
   }
 
   return newContradictions;

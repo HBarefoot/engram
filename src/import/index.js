@@ -202,6 +202,9 @@ export async function commitMemories(db, memories, options = {}) {
         }
       }
 
+      // Bulk import is intentionally rule-based: it commits the parser-provided
+      // category/entity via createMemoryWithDedup and never calls the LLM layer
+      // per item (LLM enhancement is for interactive single writes only).
       const memoryData = {
         content: validation.content,
         category: memory.category || 'fact',
@@ -210,6 +213,7 @@ export async function commitMemories(db, memories, options = {}) {
         namespace: namespace || memory.namespace || 'default',
         tags: memory.tags || [],
         source: memory.source || 'import',
+        extraction_method: 'rules',
         embedding
       };
 

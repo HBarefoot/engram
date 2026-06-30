@@ -20,6 +20,7 @@ function emptyState() {
     extractionsFallback: 0,
     contradictionsConfirmed: 0,
     contradictionsFiltered: 0,
+    contradictionsConfirmSkipped: 0,
     totalLatencyMs: 0,
     lastError: null, // { message, at }
     lastCallAt: null,
@@ -77,6 +78,11 @@ export function recordEvent({ op, outcome, latencyMs, model }) {
   if (state.events.length > MAX_EVENTS) state.events.shift();
 }
 
+/** Record contradiction confirmations skipped because the per-run cap was hit. */
+export function recordSkippedConfirmations(n = 1) {
+  state.contradictionsConfirmSkipped += n;
+}
+
 /**
  * Snapshot of counters + recent events (most-recent-first). Safe to JSON.
  */
@@ -89,6 +95,7 @@ export function getStats() {
     extractionsFallback: state.extractionsFallback,
     contradictionsConfirmed: state.contradictionsConfirmed,
     contradictionsFiltered: state.contradictionsFiltered,
+    contradictionsConfirmSkipped: state.contradictionsConfirmSkipped,
     avgLatencyMs: state.calls ? Math.round(state.totalLatencyMs / state.calls) : 0,
     lastError: state.lastError,
     lastCallAt: state.lastCallAt,

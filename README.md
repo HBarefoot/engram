@@ -332,6 +332,12 @@ First: `ollama pull llama3.2:3b`. Set `"provider": null` to turn it back off (th
 For an OpenAI-compatible local server, use `"provider": "openai-compatible"` and point `endpoint`
 at it (e.g. `http://localhost:1234`); `apiKey` is sent only if set.
 
+> **Privacy note:** "no memory data leaves your device" is only literally true when `endpoint` is
+> **local** (localhost/127.0.0.1). If you point it at a non-local host, memory content is sent there
+> for classification — the desktop AI Enhancement tab shows an explicit warning in that case. If the
+> model is unreachable, a circuit breaker pauses the layer and Engram falls back to rule-based
+> extraction with no added latency.
+
 ---
 
 ## Advanced usage

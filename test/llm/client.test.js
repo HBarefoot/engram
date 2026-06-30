@@ -1,9 +1,12 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { isLLMEnabled, llmComplete, testLLM } from '../../src/llm/index.js';
 import { extractMemoryLLM } from '../../src/extract/llm.js';
 import { extractMemory } from '../../src/extract/rules.js';
+import { resetBreaker } from '../../src/llm/breaker.js';
 
 const realFetch = global.fetch;
+
+beforeEach(() => resetBreaker()); // breaker is a singleton — don't leak across tests
 
 afterEach(() => {
   global.fetch = realFetch;
