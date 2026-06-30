@@ -43,6 +43,23 @@ export function info(msg) {
   console.log(`${chalk.blue('i')} ${msg}`);
 }
 
+// ── Star nudge ───────────────────────────────────────────────────────
+
+/**
+ * One-line, opt-out "star the repo" nudge for the human-facing server banner.
+ *
+ * MUST NOT be called from the MCP/stdio path: it writes to stdout, which is the
+ * MCP transport in `--mcp-only` mode, and any stray byte there corrupts the
+ * protocol. It is only ever invoked from the full-server (`engram start`) banner.
+ * Suppress for scripted/non-interactive use with `ENGRAM_NO_BANNER=1`.
+ */
+export function starNudge() {
+  if (process.env.ENGRAM_NO_BANNER) return;
+  console.log(
+    `${chalk.yellow('★')} ${chalk.dim('Enjoying Engram? Star it →')} ${chalk.cyan('https://github.com/HBarefoot/engram')}`
+  );
+}
+
 // ── Key-value display ────────────────────────────────────────────────
 
 /**

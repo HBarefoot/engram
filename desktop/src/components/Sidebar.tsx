@@ -1,6 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { open } from "@tauri-apps/plugin-shell";
 import { getHealthUrl, discoverPort, api } from "../lib/api";
+
+const REPO_URL = "https://github.com/HBarefoot/engram";
 
 interface NavItem {
   path: string;
@@ -185,6 +188,15 @@ export default function Sidebar() {
         >
           {SETTINGS_ITEM.icon}
           {SETTINGS_ITEM.label}
+        </button>
+
+        <button
+          onClick={() => { void open(REPO_URL); }}
+          title="Star Engram on GitHub"
+          className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800/50"
+        >
+          <span aria-hidden="true">⭐</span>
+          Star on GitHub
         </button>
 
         <div className="flex items-center gap-2 px-3 py-2">

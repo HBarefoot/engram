@@ -6,6 +6,26 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+## [1.9.1] - 2026-06-30
+
+A small, opt-out **"star the repo" nudge** in Engram's human-facing surfaces. Most users reach
+Engram through an `npx`/registry MCP config and never see the GitHub repo, so this closes the
+discovery gap where they already are — the terminal and the app. No behavior changes beyond the nudge.
+
+### Added
+
+- **CLI start banner** — `engram start` (full server) now prints one tasteful line as part of the
+  normal startup banner: `★ Enjoying Engram? Star it → https://github.com/HBarefoot/engram`.
+  Suppress it for scripted/non-interactive use with `ENGRAM_NO_BANNER=1`.
+- **Dashboard + desktop** — an understated "⭐ Star on GitHub" link in the sidebar footer (the
+  desktop app opens it in the system browser via the Tauri shell plugin).
+
+### Notes
+
+- The nudge is **never** emitted on the MCP/stdio path (`engram start --mcp-only`): it lives only in
+  the full-server banner, which writes to the human-facing stream, so it cannot corrupt the MCP
+  protocol over stdout. A subprocess test (`test/cli/star-nudge.test.js`) guards this invariant.
+
 ## [1.9.0] - 2026-06-30
 
 Tunes the optional local-LLM layer for **small models**: its two jobs (extraction and contradiction

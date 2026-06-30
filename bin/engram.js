@@ -87,6 +87,8 @@ program
       }
       f.info(`REST API   ${chalk.cyan(`http://localhost:${actualPort}`)}`);
       f.info(`Dashboard  ${chalk.cyan(`http://localhost:${actualPort}`)}`);
+      // Human-facing banner only — never the --mcp-only/stdio path above.
+      f.starNudge();
       console.log('');
 
       // Keep process alive
