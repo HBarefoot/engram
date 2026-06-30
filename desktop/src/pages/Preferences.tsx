@@ -836,7 +836,7 @@ export default function Preferences() {
                       type="text"
                       value={llm.model}
                       onChange={(e) => setLlm((p) => ({ ...p, model: e.target.value }))}
-                      placeholder="engram/extract"
+                      placeholder="henrybarefoot1987/engram-extract"
                       className="mt-1 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-transparent px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       style={{ color: "rgba(var(--text-primary), 1)" }}
                     />
@@ -844,7 +844,7 @@ export default function Preferences() {
                       className="text-xs mt-1"
                       style={{ color: "rgba(var(--text-secondary), 1)" }}
                     >
-                      We recommend <span className="font-mono">engram/extract</span> (small + constrained for
+                      We recommend <span className="font-mono">henrybarefoot1987/engram-extract</span> (small + constrained for
                       classification); any Ollama or OpenAI-compatible model also works. For a plain Ollama model,
                       pull it first: <span className="font-mono">ollama pull llama3.2:3b</span>
                     </p>

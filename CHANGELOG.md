@@ -23,7 +23,7 @@ fast, cool, and reliable. All behind `isLLMEnabled` — the disabled default pat
   so the model isn't reloaded per write.
 - **Few-shot extraction prompt** — a few compact examples (entities outside the rule extractor's
   keyword list; deliberately not from the bench fixture) lift small-model entity accuracy.
-- **Recommended model `engram/extract`** — `models/engram-extract.Modelfile` (Apache-2.0 Qwen base,
+- **Recommended model `henrybarefoot1987/engram-extract`** — `models/engram-extract.Modelfile` (Apache-2.0 Qwen base,
   extraction rubric + few-shot baked in, `temperature 0`, thinking-off) plus
   `docs/llm/recommended-model.md`. Surfaced as a recommendation (not a lock-in) in the README and the
   desktop AI-Enhancement model field. Publishing to the Ollama library is a documented manual step.
