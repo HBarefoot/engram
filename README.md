@@ -309,16 +309,18 @@ machine.
 What it improves when enabled: sharper `category`/`entity`/`confidence` on new memories, and an
 LLM confirmation step that reduces false-positive contradiction flags.
 
-**Recommended model: `engram/extract`.** The layer's two jobs are *classification*, not
+**Recommended model: `henrybarefoot1987/engram-extract`.** The layer's two jobs are *classification*, not
 generation — so a small model with constrained decoding (the model is forced to emit valid JSON)
-and thinking turned off is fast (sub-second), cool, and accurate. We package that as a one-line
-build:
+and thinking turned off is fast (sub-second), cool, and accurate. Pull it (or build it locally
+from the Modelfile):
 
 ```bash
-ollama create engram/extract -f models/engram-extract.Modelfile
+ollama pull henrybarefoot1987/engram-extract
+# …or build from source:
+ollama create henrybarefoot1987/engram-extract -f models/engram-extract.Modelfile
 ```
 
-Then set the model to `engram/extract`. It's a recommendation, not a lock-in — **any** Ollama or
+Then set the model to `henrybarefoot1987/engram-extract`. It's a recommendation, not a lock-in — **any** Ollama or
 OpenAI-compatible model still works. See [`docs/llm/recommended-model.md`](docs/llm/recommended-model.md)
 for the base model, licensing, and how to pick the smallest model that beats rules on your hardware.
 

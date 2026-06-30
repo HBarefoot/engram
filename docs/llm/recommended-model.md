@@ -1,4 +1,4 @@
-# Recommended model: `engram/extract`
+# Recommended model: `henrybarefoot1987/engram-extract`
 
 Engram's optional LLM layer is **off by default** and, when on, does just two
 small classification jobs — sharpen `category`/`entity`/`confidence` on a new
@@ -8,7 +8,7 @@ model with constrained decoding and thinking turned off** wins: it can't
 mis-format (the layer forces a JSON schema), and with no reasoning trace it
 answers in fast, cool, sub-second bursts.
 
-`engram/extract` packages that into a one-line install. It is a
+`henrybarefoot1987/engram-extract` packages that into a one-line install. It is a
 **recommendation, not a lock-in** — any Ollama or OpenAI-compatible model still
 works.
 
@@ -51,38 +51,44 @@ The sweep prints an entity-match/latency table and a verdict. See
 
 ```bash
 # 1. build the packaged model from the Modelfile
-ollama create engram/extract -f models/engram-extract.Modelfile
+ollama create henrybarefoot1987/engram-extract -f models/engram-extract.Modelfile
 
 # 2. confirm it matches the sweep winner on the extraction fixture
-node bench/extraction.mjs --model engram/extract
+node bench/extraction.mjs --model henrybarefoot1987/engram-extract
 ```
 
 Point Engram at it in `~/.engram/config.json`:
 
 ```json
-{ "llm": { "provider": "ollama", "model": "engram/extract" } }
+{ "llm": { "provider": "ollama", "model": "henrybarefoot1987/engram-extract" } }
 ```
 
 …or, in the desktop app, Preferences → **AI Enhancement** → set the model to
-`engram/extract`.
+`henrybarefoot1987/engram-extract`.
 
 ## Publishing (manual — needs Henry's Ollama account)
 
-Pushing to the public Ollama library is a **manual step**, not done by this repo
-or any agent:
+The model is published to the public Ollama library as
+**`henrybarefoot1987/engram-extract`**, so users can also just pull it:
 
 ```bash
-# requires `ollama login` with the owning account; choose the namespace
-ollama cp engram/extract hbarefoot/engram-extract
-ollama push hbarefoot/engram-extract
+ollama pull henrybarefoot1987/engram-extract
 ```
 
-Until it's published, users build it locally from the Modelfile (above), which
-is fully offline and needs no account.
+Re-publishing after a Modelfile change is a **manual step** (not done by this
+repo or any agent), and requires `ollama login` with the owning account:
+
+```bash
+ollama create henrybarefoot1987/engram-extract -f models/engram-extract.Modelfile
+ollama push henrybarefoot1987/engram-extract
+```
+
+Building locally from the Modelfile (above) stays fully offline and needs no
+account.
 
 ## Future work (not this change)
 
 A **fine-tuned** custom extraction model (LoRA on a labeled memory corpus) could
 beat a prompted base further, but it's an "if-adoption-justifies-it" item — the
 cost of curating data + training isn't warranted at current usage. The prompted
-`engram/extract` is the right scope today.
+`henrybarefoot1987/engram-extract` is the right scope today.

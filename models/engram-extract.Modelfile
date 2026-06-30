@@ -1,4 +1,4 @@
-# engram/extract — the recommended local model for Engram's optional LLM layer.
+# henrybarefoot1987/engram-extract — the recommended local model for Engram's optional LLM layer.
 #
 # Engram's LLM layer does ONE thing well: classify a memory into
 # {category, entity, confidence}. That's a constrained-decoding task, not
@@ -8,10 +8,10 @@
 # and thinking disabled.
 #
 # Build it locally:
-#     ollama create engram/extract -f models/engram-extract.Modelfile
+#     ollama create henrybarefoot1987/engram-extract -f models/engram-extract.Modelfile
 #
 # Then point Engram at it (~/.engram/config.json):
-#     { "llm": { "provider": "ollama", "model": "engram/extract" } }
+#     { "llm": { "provider": "ollama", "model": "henrybarefoot1987/engram-extract" } }
 #
 # It is a RECOMMENDATION, not a lock-in — any Ollama or OpenAI-compatible model
 # works. See docs/llm/recommended-model.md for the build/test/publish notes.
@@ -26,7 +26,7 @@ PARAMETER temperature 0
 PARAMETER num_ctx 2048
 
 # Thinking OFF. Engram also sends think:false at request time; this keeps direct
-# `ollama run engram/extract` fast too. (Qwen3 honors the /no_think directive.)
+# `ollama run henrybarefoot1987/engram-extract` fast too. (Qwen3 honors the /no_think directive.)
 SYSTEM """/no_think
 You classify a single memory for an AI agent memory store. Respond with ONLY a JSON object and nothing else — no prose, no markdown, no reasoning.
 

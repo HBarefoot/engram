@@ -21,7 +21,7 @@ Benchmark reality: the LLM's *only* clear win is **entity extraction** (+37.5 pt
 
 1. **Optimize for small models** — constrained decoding (JSON-schema output), thinking-off, few-shot. Makes a 1–2B model reliable *and* fast (sub-second bursts, quiet fans).
 2. **Bench upgrades** — `--judge-model`, thinking-off, fail-loud on unknown args; then a model sweep to find the smallest model that beats rules on entity extraction.
-3. **`engram/extract` Modelfile** — small permissive base + tuned prompt/params/constrained format, published to Ollama as the recommended (optional) model. "Ours, but your choice" — without a training project.
+3. **`henrybarefoot1987/engram-extract` Modelfile** — small permissive base + tuned prompt/params/constrained format, published to Ollama as the recommended (optional) model. "Ours, but your choice" — without a training project.
 4. **Local/cloud honesty labeling** (v1.8.1) — show on-device vs off-device clearly.
 5. **Document the recommended config** (small, non-thinking, constrained) in README + desktop.
 
@@ -29,7 +29,7 @@ Prompts: `docs/prompts/llm-small-model-optimization.md` (steps 1–3), `docs/pro
 
 ## Long vision (phased + gated)
 
-- **Phase 1 — now:** off-the-shelf small model + great prompting + the `engram/extract` Modelfile = recommended default. "Optional local AI enhancement that just works, tiny footprint, fully local."
+- **Phase 1 — now:** off-the-shelf small model + great prompting + the `henrybarefoot1987/engram-extract` Modelfile = recommended default. "Optional local AI enhancement that just works, tiny footprint, fully local."
 - **Phase 2 — if adoption justifies it:** a purpose-built, **fine-tuned tiny "Engram memory model"** targeting entity extraction + contradiction confirmation; permissive base; distributed via Ollama; recommended-but-replaceable. The moat / flagship asset.
 - **Phase 3 — aspirational:** that model + observability + the redesign's Live Agent Activity = "Engram learns how you work, entirely on your machine."
 
