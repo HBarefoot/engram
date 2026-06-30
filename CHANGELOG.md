@@ -6,6 +6,8 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-06-30
+
 ### Added
 
 - **Optional local AI enhancement (Layer 1).** The previously-dormant `llm` config block is
