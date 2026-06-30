@@ -6,7 +6,13 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
-## [1.7.0] - 2026-06-30
+### Fixed
+
+- **Desktop "AI Enhancement → Save" now works.** v1.7.0 shipped with the REST CORS
+  `Access-Control-Allow-Methods` header omitting `PUT`, so the macOS WebView's preflight blocked
+  `PUT /api/config/llm` and Save failed with "Load failed" (GET-based load and the POST "Test
+  connection" worked, which masked it). Added `PUT` to the allowed methods. (`src/server/rest.js`;
+  regression test `test/server/rest-llm-config.test.js`.)
 
 ### Added
 
