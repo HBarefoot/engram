@@ -6,6 +6,8 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-06-30
+
 ### Fixed
 
 - **Desktop "AI Enhancement → Save" now works.** v1.7.0 shipped with the REST CORS
