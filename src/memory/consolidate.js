@@ -2,6 +2,7 @@ import { getMemoriesWithEmbeddings, listMemories, updateMemory, deleteMemory, cr
 import { cosineSimilarity } from '../embed/index.js';
 import { SIMILARITY_THRESHOLDS } from './constants.js';
 import { isLLMEnabled, llmComplete } from '../llm/index.js';
+import { recordEvent } from '../llm/stats.js';
 import * as logger from '../utils/logger.js';
 
 /**
@@ -26,9 +27,16 @@ async function llmConfirmsContradiction(config, contentA, contentB) {
       json: true,
       timeoutMs: 10000
     });
-    if (!out || typeof out.contradicts !== 'boolean') return true; // unknown -> keep
+    const model = config.llm.model;
+    if (!out || typeof out.contradicts !== 'boolean') {
+      recordEvent({ op: 'contradiction', outcome: 'fallback', model });
+      return true; // unknown -> keep
+    }
+    // contradicts:true => keep (confirmed); false => drop (filtered false positive)
+    recordEvent({ op: 'contradiction', outcome: out.contradicts ? 'confirmed' : 'filtered', model });
     return out.contradicts;
   } catch {
+    recordEvent({ op: 'contradiction', outcome: 'fallback', model: config.llm?.model });
     return true; // never lose a heuristic hit on failure
   }
 }

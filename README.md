@@ -310,7 +310,10 @@ What it improves when enabled: sharper `category`/`entity`/`confidence` on new m
 LLM confirmation step that reduces false-positive contradiction flags.
 
 **Enable it (desktop app):** Preferences → **AI Enhancement** → toggle on, pick a model, **Test
-connection**, **Save**.
+connection**, **Save**. The same tab shows a **live status badge**, **activity stats** (enhanced
+vs fallback extractions, contradictions filtered, average latency), and a **recent-events list**
+so you can see the layer actually working. Programmatically, `GET /api/llm/status` and
+`GET /api/llm/stats` expose the same data (all local — no telemetry).
 
 **Enable it (config file)** — `~/.engram/config.json`:
 

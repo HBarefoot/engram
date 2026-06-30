@@ -12,7 +12,8 @@ import { getOverview, getStaleMemories, getNeverRecalled, getDuplicateClusters, 
 import { calculateHealthScore } from '../memory/health.js';
 import { validateContent } from '../extract/secrets.js';
 import { extractMemoryLLM } from '../extract/llm.js';
-import { testLLM } from '../llm/index.js';
+import { testLLM, isLLMEnabled } from '../llm/index.js';
+import { getStats as getLLMStats } from '../llm/stats.js';
 import { exportToStatic } from '../export/static.js';
 import * as logger from '../utils/logger.js';
 
@@ -190,7 +191,8 @@ export function createRESTServer(config) {
         confidence: confidence !== undefined ? confidence : 0.8,
         namespace: namespace || 'default',
         tags: tags || [],
-        source: 'api'
+        source: 'api',
+        extraction_method: 'rules'
       };
 
       if (!entity || !category) {
@@ -206,6 +208,7 @@ export function createRESTServer(config) {
         if (!category) {
           memoryData.category = extracted.category;
         }
+        memoryData.extraction_method = extracted.extraction_method || 'rules';
       }
 
       // Generate embedding
@@ -538,6 +541,40 @@ export function createRESTServer(config) {
       reply.code(500);
       return { ok: false, error: error.message };
     }
+  });
+
+  // Live LLM status for the desktop badge. Reachability is checked via testLLM
+  // but throttled/cached (>=30s) so polling stays cheap. When disabled, returns
+  // immediately without any network call.
+  let llmStatusCache = { at: 0, value: null };
+  const LLM_STATUS_TTL_MS = 30000;
+  fastify.get('/api/llm/status', async () => {
+    const llm = config.llm || {};
+    const enabled = isLLMEnabled(config);
+    const base = {
+      enabled,
+      provider: llm.provider ?? null,
+      model: llm.model ?? null,
+      endpoint: llm.endpoint ?? null
+    };
+    if (!enabled) {
+      return { ...base, reachable: false, latencyMs: null, checkedAt: null };
+    }
+    const now = Date.now();
+    if (!llmStatusCache.value || now - llmStatusCache.at > LLM_STATUS_TTL_MS) {
+      const probe = await testLLM(config);
+      llmStatusCache = {
+        at: now,
+        value: { reachable: !!probe.ok, latencyMs: probe.latencyMs ?? null, checkedAt: new Date(now).toISOString() }
+      };
+    }
+    return { ...base, ...llmStatusCache.value };
+  });
+
+  // LLM activity stats + recent-events feed (counters + ring buffer). Clean JSON
+  // contract intended to back the upcoming Command Center / Live Agent Activity.
+  fastify.get('/api/llm/stats', async () => {
+    return { enabled: isLLMEnabled(config), ...getLLMStats() };
   });
 
   // Get conflicts endpoint

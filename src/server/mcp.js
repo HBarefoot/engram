@@ -325,7 +325,8 @@ export class EngramMCPServer {
       confidence: confidence !== undefined ? confidence : 0.8,
       namespace: namespace || 'default',
       tags: tags || [],
-      source: 'mcp'
+      source: 'mcp',
+      extraction_method: 'rules'
     };
 
     // Extract category/entity if not provided. Uses the optional local LLM when
@@ -343,6 +344,7 @@ export class EngramMCPServer {
       if (!category) {
         memoryData.category = extracted.category;
       }
+      memoryData.extraction_method = extracted.extraction_method || 'rules';
     }
 
     // Generate embedding

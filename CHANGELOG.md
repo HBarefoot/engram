@@ -6,6 +6,29 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+### Added
+
+- **LLM-layer observability.** The optional local-LLM layer now reports what it's doing, all
+  computed **in-process and shown only to you** (no telemetry):
+  - In-process stats tracker (`src/llm/stats.js`): counters for calls / failures / timeouts /
+    enhanced vs fallback extractions / contradictions confirmed vs filtered, average latency,
+    last error, plus a 50-entry recent-events ring buffer. Instruments `llmComplete`,
+    `extractMemoryLLM`, and the consolidation contradiction check.
+  - New REST endpoints: `GET /api/llm/status` (live reachability/model/latency, throttled to
+    one probe per 30s) and `GET /api/llm/stats` (counters + recent events) — clean JSON
+    contracts intended to back the upcoming Command Center / Live Agent Activity views.
+  - Desktop "AI Enhancement" tab now shows a live status badge, an activity stats panel, and a
+    recent-events list (polled only while the tab is open).
+- **Per-memory `extraction_method` marker** (`'rules'` | `'llm'`) via an additive, idempotent
+  column migration. New memories record `'llm'` when the model's result was actually used; all
+  existing rows read as `'rules'`. Exposed on memory read endpoints for an "AI-enhanced" badge.
+
+### Fixed
+
+- **Preferences toggles no longer compress** next to long descriptions — the switch button and
+  knob now use `shrink-0`, so the AI Enhancement toggle (longest label) renders identically to
+  the others. (`desktop/src/pages/Preferences.tsx`.)
+
 ## [1.7.1] - 2026-06-30
 
 ### Fixed

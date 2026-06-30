@@ -72,6 +72,15 @@ function runMigrations(db) {
     // Column already exists, ignore
   }
 
+  // Add extraction_method column ('rules' | 'llm') — idempotent ADD COLUMN.
+  // Pre-existing rows backfill to the DEFAULT 'rules'. Re-running throws
+  // "duplicate column" which is swallowed (same pattern as feedback_score).
+  try {
+    db.exec(`ALTER TABLE memories ADD COLUMN extraction_method TEXT DEFAULT 'rules'`);
+  } catch (error) {
+    // Column already exists, ignore
+  }
+
   // Full-text search index
   db.exec(`
     CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
@@ -408,8 +417,8 @@ export function createMemory(db, memory) {
   const stmt = db.prepare(`
     INSERT INTO memories (
       id, content, entity, category, confidence, embedding,
-      source, namespace, tags, created_at, updated_at, decay_rate
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      source, namespace, tags, created_at, updated_at, decay_rate, extraction_method
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   stmt.run(
@@ -424,7 +433,8 @@ export function createMemory(db, memory) {
     tags,
     now,
     now,
-    memory.decay_rate !== undefined ? memory.decay_rate : 0.01
+    memory.decay_rate !== undefined ? memory.decay_rate : 0.01,
+    memory.extraction_method === 'llm' ? 'llm' : 'rules'
   );
 
   logger.debug('Memory created', { id, category: memory.category });
@@ -692,7 +702,8 @@ function deserializeMemory(row) {
     last_accessed: row.last_accessed,
     access_count: row.access_count,
     decay_rate: row.decay_rate,
-    feedback_score: row.feedback_score || 0
+    feedback_score: row.feedback_score || 0,
+    extraction_method: row.extraction_method || 'rules'
   };
 
   // Deserialize embedding if present

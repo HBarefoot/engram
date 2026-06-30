@@ -10,6 +10,7 @@
  */
 import { extractMemory } from './rules.js';
 import { isLLMEnabled, llmComplete } from '../llm/index.js';
+import { recordEvent } from '../llm/stats.js';
 
 const VALID_CATEGORIES = ['preference', 'fact', 'pattern', 'decision', 'outcome'];
 
@@ -24,8 +25,10 @@ export async function extractMemoryLLM(content, options = {}, config = null) {
   // Rule-based result is always computed and is the fallback.
   const base = extractMemory(content, options);
 
-  if (!isLLMEnabled(config)) return base;
+  // Disabled: identical to rules, no network call, no stats recorded.
+  if (!isLLMEnabled(config)) return { ...base, extraction_method: 'rules' };
 
+  const model = config.llm.model;
   try {
     const system =
       'You classify a single memory for an AI agent memory store. ' +
@@ -41,7 +44,10 @@ export async function extractMemoryLLM(content, options = {}, config = null) {
       `outcome: the result of an action.`;
 
     const out = await llmComplete(config, { system, prompt, json: true });
-    if (!out || typeof out !== 'object') return base;
+    if (!out || typeof out !== 'object') {
+      recordEvent({ op: 'extract', outcome: 'fallback', model });
+      return { ...base, extraction_method: 'rules' };
+    }
 
     const category = VALID_CATEGORIES.includes(out.category) ? out.category : base.category;
     const entity =
@@ -53,8 +59,10 @@ export async function extractMemoryLLM(content, options = {}, config = null) {
         ? out.confidence
         : base.confidence;
 
-    return { ...base, category, entity, confidence };
+    recordEvent({ op: 'extract', outcome: 'enhanced', model });
+    return { ...base, category, entity, confidence, extraction_method: 'llm' };
   } catch {
-    return base;
+    recordEvent({ op: 'extract', outcome: 'fallback', model });
+    return { ...base, extraction_method: 'rules' };
   }
 }
