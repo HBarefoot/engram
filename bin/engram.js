@@ -139,7 +139,8 @@ program
       };
 
       if (!options.entity) {
-        const extracted = await extractMemoryLLM(content, { source: 'cli', namespace: options.namespace }, config);
+        // Use validated/redacted content — the LLM must never see raw input.
+        const extracted = await extractMemoryLLM(validation.content, { source: 'cli', namespace: options.namespace }, config);
         memoryData.entity = extracted.entity;
         memoryData.extraction_method = extracted.extraction_method || 'rules';
       }

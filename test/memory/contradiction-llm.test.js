@@ -5,13 +5,17 @@ import os from 'os';
 import { initDatabase, createMemory } from '../../src/memory/store.js';
 import { detectContradictionsForMemory } from '../../src/memory/consolidate.js';
 import { getStats, reset } from '../../src/llm/stats.js';
+import { resetBreaker } from '../../src/llm/breaker.js';
 
 const realFetch = global.fetch;
 afterEach(() => {
   global.fetch = realFetch;
   vi.restoreAllMocks();
 });
-beforeEach(() => reset());
+beforeEach(() => {
+  reset();
+  resetBreaker();
+});
 
 const ollamaCfg = { llm: { provider: 'ollama', endpoint: 'http://localhost:11434', model: 'llama3.2:3b' } };
 const reply = (obj) => async () => ({ ok: true, json: async () => ({ message: { content: JSON.stringify(obj) } }) });

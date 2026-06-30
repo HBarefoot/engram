@@ -43,6 +43,9 @@ interface LlmLiveStatus {
   reachable: boolean;
   latencyMs: number | null;
   checkedAt: string | null;
+  isLocalEndpoint?: boolean;
+  breakerOpen?: boolean;
+  degraded?: boolean;
 }
 
 interface LlmEvent {
@@ -768,6 +771,11 @@ export default function Preferences() {
                       Disabled — using built-in rule-based extraction
                     </span>
                   </>
+                ) : liveStatus.breakerOpen ? (
+                  <>
+                    <span className="text-amber-500">●</span>
+                    <span>AI enhancement paused — model unreachable, using rules</span>
+                  </>
                 ) : liveStatus.reachable ? (
                   <>
                     <span className="text-green-500">●</span>
@@ -783,6 +791,15 @@ export default function Preferences() {
                   </>
                 )}
               </div>
+
+              {/* Honesty warning: a non-local endpoint means content leaves the device */}
+              {liveStatus?.enabled && liveStatus.isLocalEndpoint === false && (
+                <p className="text-xs p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300">
+                  ⚠ This endpoint is not local — memory content will be sent to{" "}
+                  <span className="font-mono">{(() => { try { return new URL(liveStatus.endpoint || "").host; } catch { return liveStatus.endpoint; } })()}</span>.
+                  Use a local model (e.g. Ollama on localhost) to keep everything on your device.
+                </p>
+              )}
 
               {llm.enabled && (
                 <>

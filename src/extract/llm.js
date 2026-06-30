@@ -14,6 +14,10 @@ import { recordEvent } from '../llm/stats.js';
 
 const VALID_CATEGORIES = ['preference', 'fact', 'pattern', 'decision', 'outcome'];
 
+// Extraction is a one-shot classification — a short budget keeps an interactive
+// write snappy. Overridable via config.llm.timeoutMs.
+const EXTRACTION_TIMEOUT_MS = 8000;
+
 /**
  * Extract a structured memory, optionally enhanced by a local LLM.
  * @param {string} content - Raw memory content
@@ -43,7 +47,12 @@ export async function extractMemoryLLM(content, options = {}, config = null) {
       `pattern: a recurring workflow; decision: a choice + rationale; ` +
       `outcome: the result of an action.`;
 
-    const out = await llmComplete(config, { system, prompt, json: true });
+    const out = await llmComplete(config, {
+      system,
+      prompt,
+      json: true,
+      timeoutMs: config.llm?.timeoutMs ?? EXTRACTION_TIMEOUT_MS
+    });
     if (!out || typeof out !== 'object') {
       recordEvent({ op: 'extract', outcome: 'fallback', model });
       return { ...base, extraction_method: 'rules' };

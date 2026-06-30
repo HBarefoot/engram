@@ -2,13 +2,17 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { recordCall, recordEvent, getStats, reset } from '../../src/llm/stats.js';
 import { llmComplete } from '../../src/llm/index.js';
 import { extractMemoryLLM } from '../../src/extract/llm.js';
+import { resetBreaker } from '../../src/llm/breaker.js';
 
 const realFetch = global.fetch;
 afterEach(() => {
   global.fetch = realFetch;
   vi.restoreAllMocks();
 });
-beforeEach(() => reset());
+beforeEach(() => {
+  reset();
+  resetBreaker();
+});
 
 const ollamaCfg = { llm: { provider: 'ollama', endpoint: 'http://localhost:11434', model: 'llama3.2:3b' } };
 const mockFetch = (h) => (global.fetch = vi.fn(h));

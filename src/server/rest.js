@@ -14,6 +14,30 @@ import { validateContent } from '../extract/secrets.js';
 import { extractMemoryLLM } from '../extract/llm.js';
 import { testLLM, isLLMEnabled } from '../llm/index.js';
 import { getStats as getLLMStats } from '../llm/stats.js';
+import { getBreakerState } from '../llm/breaker.js';
+
+/**
+ * Is an LLM endpoint on this machine (loopback)? Only then is the "no memory
+ * data leaves your device" guarantee literally true. Defaults to true for an
+ * empty endpoint (Ollama default is localhost). Non-local hosts are surfaced
+ * honestly so the desktop can warn.
+ */
+function isLocalEndpoint(endpoint) {
+  if (!endpoint) return true; // default Ollama endpoint is localhost
+  let host;
+  try {
+    host = new URL(endpoint).hostname.toLowerCase();
+  } catch {
+    return false; // unparseable -> treat as non-local (don't over-promise)
+  }
+  return (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host === '::1' ||
+    host === '0.0.0.0' ||
+    host.endsWith('.localhost')
+  );
+}
 import { exportToStatic } from '../export/static.js';
 import * as logger from '../utils/logger.js';
 
@@ -551,14 +575,18 @@ export function createRESTServer(config) {
   fastify.get('/api/llm/status', async () => {
     const llm = config.llm || {};
     const enabled = isLLMEnabled(config);
+    const breaker = getBreakerState();
+    const isLocal = isLocalEndpoint(llm.endpoint);
     const base = {
       enabled,
       provider: llm.provider ?? null,
       model: llm.model ?? null,
-      endpoint: llm.endpoint ?? null
+      endpoint: llm.endpoint ?? null,
+      isLocalEndpoint: isLocal,
+      breakerOpen: breaker.open
     };
     if (!enabled) {
-      return { ...base, reachable: false, latencyMs: null, checkedAt: null };
+      return { ...base, reachable: false, latencyMs: null, checkedAt: null, degraded: false };
     }
     const now = Date.now();
     if (!llmStatusCache.value || now - llmStatusCache.at > LLM_STATUS_TTL_MS) {
@@ -568,7 +596,8 @@ export function createRESTServer(config) {
         value: { reachable: !!probe.ok, latencyMs: probe.latencyMs ?? null, checkedAt: new Date(now).toISOString() }
       };
     }
-    return { ...base, ...llmStatusCache.value };
+    const reachable = !!llmStatusCache.value.reachable;
+    return { ...base, ...llmStatusCache.value, degraded: breaker.open || !reachable };
   });
 
   // LLM activity stats + recent-events feed (counters + ring buffer). Clean JSON

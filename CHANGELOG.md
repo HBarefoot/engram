@@ -6,6 +6,30 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+### Changed
+
+- **LLM-layer hardening (resilience, cost, safety).** All behind `isLLMEnabled` — the disabled
+  default path is byte-identical (no calls, no latency):
+  - **Circuit breaker** (`src/llm/breaker.js`): after 3 consecutive failures/timeouts the breaker
+    opens for 60s; while open `llmComplete` returns null instantly (no network), so writes fall to
+    rules with zero added latency. First call after cooldown is a half-open trial. Thresholds
+    overridable via `llm.breakerThreshold` / `llm.breakerCooldownMs`. Transitions recorded in
+    stats; `GET /api/llm/status` now returns `breakerOpen` + `degraded`.
+  - **Latency budget:** extraction timeout lowered to 8s (one-shot classification), contradiction
+    confirmation 10s; both overridable via `llm.timeoutMs`. No retries (the breaker is the answer).
+  - **Cost guards:** bulk import stays rule-based and never calls the LLM per item; consolidation
+    caps LLM contradiction confirmations per run (default 25, `llm.maxContradictionConfirms`) and
+    keeps heuristic hits beyond the cap (records the skipped count).
+  - **Secret ordering:** the CLI `remember` path now passes validated/redacted content to the LLM
+    (was passing raw input); MCP + REST already did. The LLM never sees pre-redaction content.
+  - **Endpoint honesty:** `GET /api/llm/status` exposes `isLocalEndpoint`; the desktop AI tab warns
+    when a non-local endpoint is configured ("memory content will be sent to <host>").
+  - **Prompt-injection containment** (locked in + tested): model output is accepted only when it
+    validates (category ∈ enum, confidence ∈ [0,1], bounded entity, strict boolean for
+    contradictions); anything else falls back. Injected/extra fields never propagate.
+  - **Log hygiene:** LLM paths log only metadata (op/outcome/latency/model/error class) — never
+    memory content or prompts.
+
 ### Added
 
 - **LLM-layer observability.** The optional local-LLM layer now reports what it's doing, all
