@@ -10,7 +10,7 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 A small, opt-out **"star the repo" nudge** in Engram's human-facing surfaces. Most users reach
 Engram through an `npx`/registry MCP config and never see the GitHub repo, so this closes the
-discovery gap where they already are — the terminal and the app. No behavior changes beyond the nudge.
+discovery gap where they already are — the terminal and the app. No change to how memory works.
 
 ### Added
 
@@ -19,6 +19,12 @@ discovery gap where they already are — the terminal and the app. No behavior c
   Suppress it for scripted/non-interactive use with `ENGRAM_NO_BANNER=1`.
 - **Dashboard + desktop** — an understated "⭐ Star on GitHub" link in the sidebar footer (the
   desktop app opens it in the system browser via the Tauri shell plugin).
+
+### Fixed
+
+- **MCP `serverInfo.version`** now reports the real package version instead of a hardcoded
+  `1.0.0`, so MCP clients (Claude Desktop/Code, Cursor, registries) show the version users
+  actually run. Resolves from `ENGRAM_VERSION` → `package.json` → `0.0.0` fallback.
 
 ### Notes
 

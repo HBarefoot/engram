@@ -13,6 +13,23 @@ import { generateContext } from '../memory/context.js';
 import { validateContent } from '../extract/secrets.js';
 import { extractMemoryLLM } from '../extract/llm.js';
 import * as logger from '../utils/logger.js';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+// Resolve the real package version once (mirrors bin/engram.js): build-time
+// define first, then package.json, then a safe fallback for the bundled sidecar
+// where package.json isn't on disk.
+const __mcpDir = dirname(fileURLToPath(import.meta.url));
+function resolvePackageVersion() {
+  if (process.env.ENGRAM_VERSION) return process.env.ENGRAM_VERSION;
+  try {
+    return JSON.parse(readFileSync(join(__mcpDir, '../../package.json'), 'utf-8')).version;
+  } catch {
+    return '0.0.0';
+  }
+}
+const PKG_VERSION = resolvePackageVersion();
 
 /**
  * MCP Server for Engram
@@ -25,7 +42,7 @@ export class EngramMCPServer {
     this.server = new Server(
       {
         name: 'engram',
-        version: '1.0.0'
+        version: PKG_VERSION
       },
       {
         capabilities: {

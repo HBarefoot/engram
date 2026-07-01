@@ -1,7 +1,7 @@
 # Competitive intel — AI agent memory layer
 
 > Living document. Update when a competitor releases a major version or shifts positioning.
-> Last refreshed: 2026-06-02.
+> Last refreshed: 2026-06-30.
 
 ## TL;DR
 
@@ -9,8 +9,9 @@ The "in-process, no-infra, MCP-native" wedge that Engram's README leans on **is 
 
 | Where Engram leads | Where competitors lead |
 |---|---|
-| Stable v1.4.x release line (Lodis is v0.5.x; Mem0/Zep/Letta require infra) | Lodis: knowledge graph, entity types, temporal supersession, 40 tools |
-| Automatic secret detection on every write | Mem0/Zep/Letta: LLM-powered extraction quality |
+| Stable v1.9.x release line (Lodis is v0.5.x; Mem0/Zep/Letta require infra) | Lodis: knowledge graph, entity types, temporal supersession, 40 tools |
+| Automatic secret detection on every write | Mem0/Zep/Letta: higher LLM-extraction accuracy on LoCoMo/LongMemEval benchmarks |
+| Optional **on-device** LLM extraction (off by default) — no cloud required for the accuracy lift | Mem0/Zep/Letta: cloud LLMs with larger models behind the extraction |
 | Agent auto-discovery + Integration Wizard (dashboard) | All except Engram: more established marketing presence |
 | Desktop Tauri app (macOS) | Mem0: cloud SaaS option |
 | REST API alongside MCP | Mem0/Zep/Letta: hosted team-sharing offerings |
@@ -78,7 +79,7 @@ The "in-process, no-infra, MCP-native" wedge that Engram's README leans on **is 
 
 ### Where Engram leads Lodis
 
-- **Stable v1.4.x** vs Lodis v0.5.1 alpha
+- **Stable v1.9.x** vs Lodis v0.5.1 alpha
 - **Automatic secret detection on every write** — Engram blocks API keys/private keys/connection strings/JWTs by default; Lodis has `memory_scrub` as an opt-in tool
 - **Agent auto-discovery** via the dashboard Integration Wizard
 - **Desktop Tauri app** for macOS users who want a menu-bar memory layer
@@ -108,7 +109,7 @@ The "in-process, no-infra, MCP-native" wedge that Engram's README leans on **is 
 
 ### Where they lead Engram
 
-- LLM-powered memory extraction
+- LLM-powered memory extraction with large cloud models — still ahead on raw extraction accuracy against LoCoMo/LongMemEval-style benchmarks
 - Cloud-hosted option for users who don't want any local infra
 - Established brand, large community
 - Production-ready scale
@@ -119,8 +120,9 @@ The "in-process, no-infra, MCP-native" wedge that Engram's README leans on **is 
 - No Docker, no Postgres
 - Offline-capable
 - ~23 MB footprint vs hundreds of MB of containers
+- **Optional on-device LLM extraction** (since v1.7; recommended model `henrybarefoot1987/engram-extract` — Qwen3-1.7B, Apache-2.0) — off by default, rule-based on the default path. Sharpens entity/category extraction (~46% → ~96% entity match on our fixture) without sending memory content to a cloud provider. Not a claim to beat Mem0/Zep on LoCoMo/LongMemEval — the win is that the accuracy lift stays 100% local and opt-in.
 
-*Note: not personally verified this round; carry-over from README comparison. Verify if Mem0 ships a major release before Engram's launch.*
+*Note: Mem0 rows not personally re-verified this round (carry-over from README comparison). Verify if Mem0 ships a major release before Engram's launch.*
 
 ---
 
