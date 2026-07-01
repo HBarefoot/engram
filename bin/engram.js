@@ -4,10 +4,12 @@ import { Command } from 'commander';
 import { startMCPServer } from '../src/server/mcp.js';
 import { startRESTServer } from '../src/server/rest.js';
 import { loadConfig, getDatabasePath, getModelsPath } from '../src/config/index.js';
-import { initDatabase, createMemory, getMemory, deleteMemory, listMemories, getStats } from '../src/memory/store.js';
+import { initDatabase, createMemory, getMemory, updateMemory, deleteMemory, listMemories, getStats, deleteMemoriesByNamespace, deleteStaleMemories } from '../src/memory/store.js';
 import { recallMemories, formatRecallResults } from '../src/memory/recall.js';
 import { consolidate, getConflicts } from '../src/memory/consolidate.js';
-import { validateContent } from '../src/extract/secrets.js';
+import { runAudit } from '../src/memory/audit.js';
+import { backupDatabase } from '../src/utils/backup.js';
+import { validateContent, redactSecrets } from '../src/extract/secrets.js';
 import { extractMemoryLLM } from '../src/extract/llm.js';
 import { exportToStatic } from '../src/export/static.js';
 import { shouldDefaultToMcp } from '../src/utils/mcp-default.js';
@@ -602,6 +604,164 @@ program
         // Output to stdout (raw, no formatting)
         console.log(result.content);
       }
+
+      db.close();
+    } catch (error) {
+      f.error(error.message);
+      process.exit(1);
+    }
+  });
+
+// Audit command — read-only health + secret scan (CI-friendly)
+program
+  .command('audit')
+  .description('Audit the memory store for secrets, staleness, and duplicates')
+  .option('-n, --namespace <name>', 'Scope the secret scan to one namespace')
+  .option('--json', 'Emit the report as JSON')
+  .option('--fix', 'Redact detected secrets in place (backs up first)')
+  .option('--config <path>', 'Path to config file')
+  .option('--data-dir <path>', 'Override data directory (also: ENGRAM_DATA_DIR env)')
+  .action(async (options) => {
+    const f = await loadFormat();
+    try {
+      const config = loadConfig(options.config, { dataDir: options.dataDir });
+      const db = initDatabase(getDatabasePath(config));
+
+      const report = runAudit(db, { namespace: options.namespace, config });
+
+      // --fix: redact secrets in place (guarded by a backup first).
+      if (options.fix && report.hasSecrets) {
+        const backupPath = backupDatabase(db, config);
+        let fixed = 0;
+        for (const finding of report.secrets.findings) {
+          const memory = getMemory(db, finding.id);
+          if (!memory) continue;
+          updateMemory(db, finding.id, { content: redactSecrets(memory.content) });
+          fixed += 1;
+        }
+        if (!options.json) {
+          console.log('');
+          f.success(`Redacted secrets in ${fixed} memor${fixed === 1 ? 'y' : 'ies'}`);
+          f.info(`Backup: ${backupPath}`);
+        }
+        db.close();
+        return; // fixed => clean; exit 0
+      }
+
+      if (options.json) {
+        console.log(JSON.stringify(report, null, 2));
+      } else {
+        f.printSection('Audit');
+        console.log('');
+        f.printKeyValue([
+          ['Memories', String(report.stats.total)],
+          ['Namespace', report.scannedNamespace || 'all'],
+          ['Stale', String(report.stale.count)],
+          ['Never recalled', String(report.neverRecalled.count)],
+          ['Duplicate clusters', String(report.duplicates.clusters)],
+          ['Unresolved conflicts', String(report.unresolvedContradictions)],
+          ['DB size', report.dbSizeBytes != null ? `${(report.dbSizeBytes / 1024).toFixed(1)} KB` : 'n/a'],
+          ['Encrypted', report.encrypted ? 'yes' : 'no'],
+          ['Secrets', report.hasSecrets ? String(report.secrets.count) : 'none']
+        ]);
+
+        if (report.hasSecrets) {
+          console.log('');
+          const t = f.createTable({ head: ['Memory', 'Namespace', 'Types'] });
+          for (const finding of report.secrets.findings) {
+            t.push([f.shortId(finding.id), finding.namespace, finding.types.join(', ')]);
+          }
+          console.log(t.toString());
+          console.log('');
+          f.warning('Run `engram audit --fix` to redact these in place.');
+        }
+        console.log('');
+      }
+
+      db.close();
+
+      // Non-zero exit when secrets are present, so `engram audit` can gate CI.
+      if (report.hasSecrets) process.exit(2);
+    } catch (error) {
+      f.error(error.message);
+      process.exit(1);
+    }
+  });
+
+// Purge command — destructive, guarded (dry-run by default)
+program
+  .command('purge')
+  .description('Delete memories in bulk (dry-run unless --yes)')
+  .option('-n, --namespace <name>', 'Delete all memories in a namespace')
+  .option('--project <name>', 'Alias for --namespace')
+  .option('--stale', 'Delete stale memories (>30 days since last activity)')
+  .option('--before <date>', 'Delete memories with no activity since <date> (ISO)')
+  .option('--all', 'Delete every memory')
+  .option('--yes', 'Actually perform the deletion (otherwise dry-run)')
+  .option('--config <path>', 'Path to config file')
+  .option('--data-dir <path>', 'Override data directory (also: ENGRAM_DATA_DIR env)')
+  .action(async (options) => {
+    const f = await loadFormat();
+    try {
+      const config = loadConfig(options.config, { dataDir: options.dataDir });
+      const db = initDatabase(getDatabasePath(config));
+
+      const namespace = options.namespace || options.project;
+
+      // Resolve exactly one target selector into { label, count, run }.
+      let target;
+      if (namespace) {
+        const count = db.prepare('SELECT COUNT(*) AS n FROM memories WHERE namespace = ?').get(namespace).n;
+        target = { label: `namespace "${namespace}"`, count, run: () => deleteMemoriesByNamespace(db, namespace) };
+      } else if (options.all) {
+        const count = db.prepare('SELECT COUNT(*) AS n FROM memories').get().n;
+        target = { label: 'ALL memories', count, run: () => db.prepare('DELETE FROM memories').run().changes };
+      } else if (options.stale || options.before) {
+        let before = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        if (options.before) {
+          const parsed = Date.parse(options.before);
+          if (Number.isNaN(parsed)) {
+            f.error(`Invalid --before date: ${options.before}`);
+            process.exit(1);
+          }
+          before = parsed;
+        }
+        const count = db.prepare(
+          `SELECT COUNT(*) AS n FROM memories
+           WHERE (last_accessed IS NOT NULL AND last_accessed < ?)
+              OR (last_accessed IS NULL AND created_at < ?)`
+        ).get(before, before).n;
+        target = {
+          label: options.before ? `stale before ${new Date(before).toISOString().slice(0, 10)}` : 'stale (>30 days)',
+          count,
+          run: () => deleteStaleMemories(db, { before })
+        };
+      } else {
+        f.error('Specify a target: --namespace <n>, --stale, --before <date>, or --all');
+        process.exit(1);
+      }
+
+      console.log('');
+      if (target.count === 0) {
+        f.success(`Nothing to purge — 0 memories match ${target.label}.`);
+        console.log('');
+        db.close();
+        return;
+      }
+
+      if (!options.yes) {
+        f.warning(`DRY RUN — would delete ${target.count} memor${target.count === 1 ? 'y' : 'ies'} (${target.label}).`);
+        f.info('Re-run with --yes to perform the deletion (a timestamped backup is made first).');
+        console.log('');
+        db.close();
+        return;
+      }
+
+      const backupPath = backupDatabase(db, config);
+      const deleted = target.run();
+      f.success(`Deleted ${deleted} memor${deleted === 1 ? 'y' : 'ies'} (${target.label}).`);
+      f.info(`Backup: ${backupPath}`);
+      console.log('');
 
       db.close();
     } catch (error) {

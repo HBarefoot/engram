@@ -537,6 +537,48 @@ export function deleteMemory(db, id) {
 }
 
 /**
+ * Delete every memory in a namespace. Dependent rows follow the schema FKs:
+ * memory_feedback CASCADE-deletes; contradictions have their memory refs SET
+ * NULL (rows survive as history). FTS stays in sync via the memories_ad trigger.
+ * @param {Database} db - SQLite database instance
+ * @param {string} namespace - Namespace to purge
+ * @returns {number} Count of memories deleted
+ */
+export function deleteMemoriesByNamespace(db, namespace) {
+  const result = db.prepare('DELETE FROM memories WHERE namespace = ?').run(namespace);
+  logger.debug('Memories deleted by namespace', { namespace, deleted: result.changes });
+  return result.changes;
+}
+
+/**
+ * Delete stale memories. "Stale" mirrors analytics.getStaleMemories: last
+ * accessed before the cutoff, or never accessed and created before the cutoff.
+ * An optional confidence ceiling restricts deletion to low-value rows.
+ * @param {Database} db - SQLite database instance
+ * @param {Object} [options]
+ * @param {number} [options.before] - Unix ms cutoff (defaults to 30 days ago)
+ * @param {number} [options.minConfidence] - Only delete rows with confidence <= this
+ * @returns {number} Count of memories deleted
+ */
+export function deleteStaleMemories(db, options = {}) {
+  const before = options.before ?? Date.now() - 30 * 24 * 60 * 60 * 1000;
+  const params = [before, before];
+
+  let sql = `DELETE FROM memories
+    WHERE ((last_accessed IS NOT NULL AND last_accessed < ?)
+        OR (last_accessed IS NULL AND created_at < ?))`;
+
+  if (options.minConfidence !== undefined && options.minConfidence !== null) {
+    sql += ' AND confidence <= ?';
+    params.push(options.minConfidence);
+  }
+
+  const result = db.prepare(sql).run(...params);
+  logger.debug('Stale memories deleted', { before, deleted: result.changes });
+  return result.changes;
+}
+
+/**
  * List memories with optional filters
  * @param {Database} db - SQLite database instance
  * @param {Object} [options] - Query options
