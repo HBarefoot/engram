@@ -3,7 +3,7 @@ import os from 'os';
 import { detectSources, scanSources, commitMemories } from './index.js';
 import { initDatabase } from '../memory/store.js';
 import { initStats } from '../llm/stats.js';
-import { loadConfig, getDatabasePath } from '../config/index.js';
+import { loadConfig, getDatabasePath, resolveEncryptionKey } from '../config/index.js';
 import {
   printHeader, printSection, warning, info,
   categoryBadge, confidenceColor, truncate,
@@ -169,7 +169,7 @@ export async function runWizard(options = {}) {
     // Step 6: Commit
     const commitSpin = spinner('Committing memories...');
     commitSpin.start();
-    const db = initDatabase(getDatabasePath(config));
+    const db = initDatabase(getDatabasePath(config), { encryptionKey: resolveEncryptionKey(config) });
     initStats(db);
 
     const commitResult = await commitMemories(db, scanResult.memories, {
@@ -250,7 +250,7 @@ async function runNonInteractive(config, options) {
 
   const commitSpin = spinner('Committing memories...');
   commitSpin.start();
-  const db = initDatabase(getDatabasePath(config));
+  const db = initDatabase(getDatabasePath(config), { encryptionKey: resolveEncryptionKey(config) });
   initStats(db);
   const commitResult = await commitMemories(db, scanResult.memories, {
     namespace: options.namespace
