@@ -36,16 +36,16 @@ Engram runs *inside* your agent's process — no service to deploy, no account, 
 
 | Metric | Engram | |
 |---|---|---|
-| Cold start → first recall | **~124 ms** | import → first answer, embedding-model load included |
-| Warm recall (p50) | **~4 ms** | median query latency once the model is in memory |
-| Package download | **~585 KB** | the npm package (1.3 MB unpacked) |
+| Cold start → first recall | **under 200 ms** | import → first answer, model load included (M-series; hardware-dependent) |
+| Warm recall (p50, 1k memories) | **~4 ms** | median query latency once the model is in memory |
+| Package download | **~571 KB** | the npm package (1.3 MB unpacked) |
 | Embedding model | **~23 MB** | `all-MiniLM-L6-v2`, fetched once, cached at `~/.engram/models` |
 | External services | **0** | no database, broker, or cloud account |
 | Works offline | **✅** | zero network calls on the default path |
 
 <sub>Measured on an Apple M4 Pro over 1,000 seeded memories — reproduce with `npm run bench`. These are footprint and latency numbers, **not** an accuracy claim: Engram doesn't try to out-rank Mem0 or Zep on memory benchmarks. The point is solid recall with none of the operational surface.</sub>
 
-**Optional accuracy lift — still 100% local.** If you already run a local model, the opt-in [LLM layer](#optional-local-ai-enhancement-ollama) sharpens fact extraction: entity-extraction accuracy climbs from ~46% (rule-based) to ~96% with the recommended `henrybarefoot1987/engram-extract` model (**+50 pts**), without a single byte leaving your device.
+**Optional accuracy lift — still 100% local.** If you already run a local model, the opt-in [LLM layer](#optional-local-ai-enhancement-ollama) sharpens fact extraction: entity-extraction accuracy climbs from 45.8% (rule-based) to 95.8% with the recommended `henrybarefoot1987/engram-extract` model (qwen3:1.7b) — **+50 pts** — without a single byte leaving your device.
 
 ---
 
@@ -89,7 +89,7 @@ Most agent-memory products are services you run alongside your agent — Postgre
 | **LLM-powered extraction** | ✅ Optional, on-device (Ollama; rule-based default) | ❌ LLM-free read/write | ✅ Built-in | ✅ Built-in | ✅ Built-in |
 | **Feedback / contradiction workflow** | ✅ Side-by-side conflict-resolution UI + feedback loop | 🟡 Programmatic correct/confirm/supersede tools | 🟡 No first-class feedback | 🟡 | 🟡 |
 
-*Sources: [@sunriselabs/lodis](https://www.npmjs.com/package/@sunriselabs/lodis), [Sunrise-Labs-Dot-AI/engrams](https://github.com/Sunrise-Labs-Dot-AI/engrams), [mem0.ai](https://mem0.ai/), [github.com/getzep/zep](https://github.com/getzep/zep), [github.com/letta-ai/letta](https://github.com/letta-ai/letta). See [`docs/competitive-intel.md`](docs/competitive-intel.md) for the full breakdown. Engram ships **optional, on-device LLM extraction** (v1.9+): point `llm.*` at a local model — the recommended `henrybarefoot1987/engram-extract` (Qwen3-1.7B, Apache-2.0) or any Ollama / OpenAI-compatible endpoint — to sharpen category/entity extraction (entity recognition +50 pts vs rules in our benchmark), still 100% local and **off by default** (the zero-config path stays rule-based, offline, and infra-free). Mem0/Zep/Letta build LLM extraction in via a cloud model; Lodis is LLM-free read/write with a broader feature surface — we list it honestly.*
+*Sources: [@sunriselabs/lodis](https://www.npmjs.com/package/@sunriselabs/lodis), [Sunrise-Labs-Dot-AI/engrams](https://github.com/Sunrise-Labs-Dot-AI/engrams), [mem0.ai](https://mem0.ai/), [github.com/getzep/zep](https://github.com/getzep/zep), [github.com/letta-ai/letta](https://github.com/letta-ai/letta). See [`docs/competitive-intel.md`](docs/competitive-intel.md) for the full breakdown. Engram ships **optional, on-device LLM extraction** (v1.9+): point `llm.*` at a local model — the recommended `henrybarefoot1987/engram-extract` (Qwen3-1.7B, Apache-2.0) or any Ollama / OpenAI-compatible endpoint — to sharpen category/entity extraction (entity recognition +50 pts vs rules — 45.8% → 95.8% — with `engram-extract` (qwen3:1.7b) in our benchmark), still 100% local and **off by default** (the zero-config path stays rule-based, offline, and infra-free). Mem0/Zep/Letta build LLM extraction in via a cloud model; Lodis is LLM-free read/write with a broader feature surface — we list it honestly.*
 
 **TL;DR — when each one fits.** Pick **Engram** if you want a focused, stable, local-first memory layer with practical guardrails (secret detection, agent auto-discovery, desktop app), a simple 5-category mental model, and optional on-device LLM extraction when you want it. Pick **Lodis** if you want a knowledge-graph-style memory with 14 entity types and temporal supersession. Pick **Mem0/Zep/Letta** if you want cloud-LLM extraction built in and don't mind operating infrastructure for it.
 

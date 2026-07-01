@@ -15,7 +15,7 @@ Two narrow **classification** tasks (not generation):
 1. **Extraction** — sharpen `category`/`entity`/`confidence` on a new memory.
 2. **Contradiction confirmation** — yes/no on whether two memories conflict (false-positive filter).
 
-Benchmark reality: the LLM's *only* clear win is **entity extraction** (+37.5 pts vs rules); category is a wash. Optimize for that.
+Benchmark reality: the LLM's *only* clear win is **entity extraction** — **+50 pts vs rules** (45.8% → 95.8%) with `engram-extract` (qwen3:1.7b); category is a wash. (An earlier generic `llama3.2:3b` run was only +37.5, which is why the recommended figure is always attributed to `engram-extract`.) Optimize for that.
 
 ## Immediate steps (now — cheap, light, on-brand)
 
