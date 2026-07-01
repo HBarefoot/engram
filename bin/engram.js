@@ -9,6 +9,7 @@ import { recallMemories, formatRecallResults } from '../src/memory/recall.js';
 import { consolidate, getConflicts } from '../src/memory/consolidate.js';
 import { validateContent } from '../src/extract/secrets.js';
 import { extractMemoryLLM } from '../src/extract/llm.js';
+import { initStats } from '../src/llm/stats.js';
 import { exportToStatic } from '../src/export/static.js';
 import { shouldDefaultToMcp } from '../src/utils/mcp-default.js';
 import * as logger from '../src/utils/logger.js';
@@ -120,6 +121,7 @@ program
     try {
       const config = loadConfig(options.config, { dataDir: options.dataDir });
       const db = initDatabase(getDatabasePath(config));
+      initStats(db); // persist LLM stats so terminal activity reaches the DB-backed panel
 
       // Validate content
       const validation = validateContent(content, { autoRedact: config.security?.secretDetection !== false });
@@ -201,6 +203,7 @@ program
     try {
       const config = loadConfig(options.config, { dataDir: options.dataDir });
       const db = initDatabase(getDatabasePath(config));
+      initStats(db); // persist LLM stats so terminal activity reaches the DB-backed panel
       const modelsPath = getModelsPath(config);
 
       const memories = await recallMemories(
@@ -267,6 +270,7 @@ program
     try {
       const config = loadConfig(options.config, { dataDir: options.dataDir });
       const db = initDatabase(getDatabasePath(config));
+      initStats(db); // persist LLM stats so terminal activity reaches the DB-backed panel
 
       const memory = getMemory(db, id);
 
@@ -316,6 +320,7 @@ program
     try {
       const config = loadConfig(options.config, { dataDir: options.dataDir });
       const db = initDatabase(getDatabasePath(config));
+      initStats(db); // persist LLM stats so terminal activity reaches the DB-backed panel
 
       const memories = listMemories(db, {
         limit: options.limit,
@@ -371,6 +376,7 @@ program
     try {
       const config = loadConfig(options.config, { dataDir: options.dataDir });
       const db = initDatabase(getDatabasePath(config));
+      initStats(db); // persist LLM stats so terminal activity reaches the DB-backed panel
       const stats = getStats(db);
 
       f.printHeader(version);
@@ -465,6 +471,7 @@ program
     try {
       const config = loadConfig(options.config, { dataDir: options.dataDir });
       const db = initDatabase(getDatabasePath(config));
+      initStats(db); // persist LLM stats so terminal activity reaches the DB-backed panel
 
       const spin = f.spinner('Running consolidation...');
       spin.start();
@@ -510,6 +517,7 @@ program
     try {
       const config = loadConfig(options.config, { dataDir: options.dataDir });
       const db = initDatabase(getDatabasePath(config));
+      initStats(db); // persist LLM stats so terminal activity reaches the DB-backed panel
 
       const conflicts = getConflicts(db);
 
@@ -562,6 +570,7 @@ program
     try {
       const config = loadConfig(options.config, { dataDir: options.dataDir });
       const db = initDatabase(getDatabasePath(config));
+      initStats(db); // persist LLM stats so terminal activity reaches the DB-backed panel
 
       const categories = options.categories ? options.categories.split(',') : undefined;
 
