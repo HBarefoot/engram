@@ -120,7 +120,7 @@ The "in-process, no-infra, MCP-native" wedge that Engram's README leans on **is 
 - No Docker, no Postgres
 - Offline-capable
 - ~23 MB footprint vs hundreds of MB of containers
-- **Optional on-device LLM extraction** (since v1.7; recommended model `henrybarefoot1987/engram-extract` — Qwen3-1.7B, Apache-2.0) — off by default, rule-based on the default path. Sharpens entity/category extraction (~46% → ~96% entity match on our fixture) without sending memory content to a cloud provider. Not a claim to beat Mem0/Zep on LoCoMo/LongMemEval — the win is that the accuracy lift stays 100% local and opt-in.
+- **Optional on-device LLM extraction** (since v1.7; recommended model `henrybarefoot1987/engram-extract` — Qwen3-1.7B, Apache-2.0) — off by default, rule-based on the default path. Sharpens entity/category extraction (45.8% → 95.8% entity match, **+50 pts**, with `engram-extract` / qwen3:1.7b on our fixture) without sending memory content to a cloud provider. Not a claim to beat Mem0/Zep on LoCoMo/LongMemEval — the win is that the accuracy lift stays 100% local and opt-in.
 
 *Note: Mem0 rows not personally re-verified this round (carry-over from README comparison). Verify if Mem0 ships a major release before Engram's launch.*
 
