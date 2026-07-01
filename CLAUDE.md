@@ -87,6 +87,8 @@ engram status                 # Health check
 
 engram consolidate            # Run consolidation (--no-duplicates|--no-contradictions|--no-decay|--cleanup-stale)
 engram conflicts              # List unresolved contradictions
+engram audit                  # Read-only health + secret scan (-n namespace --json --fix); exits non-zero if secrets found
+engram purge                  # Bulk delete, dry-run by default (--namespace/--project --stale --before <date> --all --yes; backs up first)
 engram export-context         # Export a curated context block (-o -f markdown|claude|txt|json -c --min-confidence ...)
 engram import                 # Import from local sources (-s source --dry-run -n namespace -p paths)
 ```
