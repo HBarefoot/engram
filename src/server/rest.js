@@ -4,7 +4,7 @@ import fs from 'fs';
 import net from 'net';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { loadConfig, saveConfig, getDatabasePath, getModelsPath } from '../config/index.js';
+import { loadConfig, saveConfig, getDatabasePath, getModelsPath, resolveEncryptionKey } from '../config/index.js';
 import { initDatabase, createMemory, getMemory, deleteMemory, listMemories, getStats, listContradictions, resolveContradiction, countUnresolvedContradictions, migrateTagConflicts } from '../memory/store.js';
 import { recallMemories } from '../memory/recall.js';
 import { consolidate, getConflicts, detectContradictionsForMemory } from '../memory/consolidate.js';
@@ -96,7 +96,7 @@ export function createRESTServer(config) {
   });
 
   // Initialize database
-  const db = initDatabase(getDatabasePath(config));
+  const db = initDatabase(getDatabasePath(config), { encryptionKey: resolveEncryptionKey(config) });
   const modelsPath = getModelsPath(config);
 
   // Migrate legacy tag-based conflicts to contradictions table

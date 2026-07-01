@@ -5,7 +5,7 @@ import {
   ListToolsRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
 
-import { loadConfig, getDatabasePath, getModelsPath } from '../config/index.js';
+import { loadConfig, getDatabasePath, getModelsPath, resolveEncryptionKey } from '../config/index.js';
 import { initDatabase, createMemory, createMemoryWithDedup, getMemory, deleteMemory, getStats } from '../memory/store.js';
 import { recallMemories, formatRecallResults } from '../memory/recall.js';
 import { recordFeedback, getFeedbackStats } from '../memory/feedback.js';
@@ -60,7 +60,7 @@ export class EngramMCPServer {
   initializeDatabase() {
     if (!this.db) {
       const dbPath = getDatabasePath(this.config);
-      this.db = initDatabase(dbPath);
+      this.db = initDatabase(dbPath, { encryptionKey: resolveEncryptionKey(this.config) });
       logger.info('MCP Server database initialized', { path: dbPath });
     }
     return this.db;

@@ -3,8 +3,8 @@
 import { Command } from 'commander';
 import { startMCPServer } from '../src/server/mcp.js';
 import { startRESTServer } from '../src/server/rest.js';
-import { loadConfig, getDatabasePath, getModelsPath } from '../src/config/index.js';
-import { initDatabase, createMemory, getMemory, updateMemory, deleteMemory, listMemories, getStats, deleteMemoriesByNamespace, deleteStaleMemories } from '../src/memory/store.js';
+import { loadConfig, saveConfig, getDatabasePath, getModelsPath, resolveEncryptionKey } from '../src/config/index.js';
+import { initDatabase, createMemory, getMemory, updateMemory, deleteMemory, listMemories, getStats, deleteMemoriesByNamespace, deleteStaleMemories, encryptDatabase, rekeyDatabase } from '../src/memory/store.js';
 import { recallMemories, formatRecallResults } from '../src/memory/recall.js';
 import { consolidate, getConflicts } from '../src/memory/consolidate.js';
 import { runAudit } from '../src/memory/audit.js';
@@ -75,7 +75,7 @@ program
       // One-time, opt-in feedback nudge — TTY only, never in MCP/CI, never blocks.
       try {
         const { maybeShowNudge } = await import('../src/utils/nudge.js');
-        const nudgeDb = initDatabase(getDatabasePath(config));
+        const nudgeDb = initDatabase(getDatabasePath(config), { encryptionKey: resolveEncryptionKey(config) });
         maybeShowNudge(nudgeDb);
         nudgeDb.close();
       } catch {
@@ -121,7 +121,7 @@ program
     const f = await loadFormat();
     try {
       const config = loadConfig(options.config, { dataDir: options.dataDir });
-      const db = initDatabase(getDatabasePath(config));
+      const db = initDatabase(getDatabasePath(config), { encryptionKey: resolveEncryptionKey(config) });
 
       // Validate content
       const validation = validateContent(content, { autoRedact: config.security?.secretDetection !== false });
@@ -202,7 +202,7 @@ program
     const chalk = (await import('chalk')).default;
     try {
       const config = loadConfig(options.config, { dataDir: options.dataDir });
-      const db = initDatabase(getDatabasePath(config));
+      const db = initDatabase(getDatabasePath(config), { encryptionKey: resolveEncryptionKey(config) });
       const modelsPath = getModelsPath(config);
 
       const memories = await recallMemories(
@@ -268,7 +268,7 @@ program
     const chalk = (await import('chalk')).default;
     try {
       const config = loadConfig(options.config, { dataDir: options.dataDir });
-      const db = initDatabase(getDatabasePath(config));
+      const db = initDatabase(getDatabasePath(config), { encryptionKey: resolveEncryptionKey(config) });
 
       const memory = getMemory(db, id);
 
@@ -317,7 +317,7 @@ program
     const f = await loadFormat();
     try {
       const config = loadConfig(options.config, { dataDir: options.dataDir });
-      const db = initDatabase(getDatabasePath(config));
+      const db = initDatabase(getDatabasePath(config), { encryptionKey: resolveEncryptionKey(config) });
 
       const memories = listMemories(db, {
         limit: options.limit,
@@ -372,7 +372,7 @@ program
     const chalk = (await import('chalk')).default;
     try {
       const config = loadConfig(options.config, { dataDir: options.dataDir });
-      const db = initDatabase(getDatabasePath(config));
+      const db = initDatabase(getDatabasePath(config), { encryptionKey: resolveEncryptionKey(config) });
       const stats = getStats(db);
 
       f.printHeader(version);
@@ -466,7 +466,7 @@ program
     const f = await loadFormat();
     try {
       const config = loadConfig(options.config, { dataDir: options.dataDir });
-      const db = initDatabase(getDatabasePath(config));
+      const db = initDatabase(getDatabasePath(config), { encryptionKey: resolveEncryptionKey(config) });
 
       const spin = f.spinner('Running consolidation...');
       spin.start();
@@ -511,7 +511,7 @@ program
     const chalk = (await import('chalk')).default;
     try {
       const config = loadConfig(options.config, { dataDir: options.dataDir });
-      const db = initDatabase(getDatabasePath(config));
+      const db = initDatabase(getDatabasePath(config), { encryptionKey: resolveEncryptionKey(config) });
 
       const conflicts = getConflicts(db);
 
@@ -563,7 +563,7 @@ program
     const chalk = (await import('chalk')).default;
     try {
       const config = loadConfig(options.config, { dataDir: options.dataDir });
-      const db = initDatabase(getDatabasePath(config));
+      const db = initDatabase(getDatabasePath(config), { encryptionKey: resolveEncryptionKey(config) });
 
       const categories = options.categories ? options.categories.split(',') : undefined;
 
@@ -625,7 +625,7 @@ program
     const f = await loadFormat();
     try {
       const config = loadConfig(options.config, { dataDir: options.dataDir });
-      const db = initDatabase(getDatabasePath(config));
+      const db = initDatabase(getDatabasePath(config), { encryptionKey: resolveEncryptionKey(config) });
 
       const report = runAudit(db, { namespace: options.namespace, config });
 
@@ -704,7 +704,7 @@ program
     const f = await loadFormat();
     try {
       const config = loadConfig(options.config, { dataDir: options.dataDir });
-      const db = initDatabase(getDatabasePath(config));
+      const db = initDatabase(getDatabasePath(config), { encryptionKey: resolveEncryptionKey(config) });
 
       const namespace = options.namespace || options.project;
 
@@ -764,6 +764,80 @@ program
       console.log('');
 
       db.close();
+    } catch (error) {
+      f.error(error.message);
+      process.exit(1);
+    }
+  });
+
+// Encrypt command — migrate a plaintext DB to encrypted at rest
+program
+  .command('encrypt')
+  .description('Encrypt the memory database at rest (opt-in; requires ENGRAM_DB_KEY)')
+  .option('--config <path>', 'Path to config file')
+  .option('--data-dir <path>', 'Override data directory (also: ENGRAM_DATA_DIR env)')
+  .action(async (options) => {
+    const f = await loadFormat();
+    try {
+      const key = process.env.ENGRAM_DB_KEY;
+      if (!key) {
+        f.error('Set ENGRAM_DB_KEY to your passphrase before running `engram encrypt`.');
+        process.exit(1);
+      }
+
+      const config = loadConfig(options.config, { dataDir: options.dataDir });
+      const dbPath = getDatabasePath(config);
+
+      // Back up the plaintext DB first (open → VACUUM INTO → close).
+      const plainDb = initDatabase(dbPath); // no key: current DB is plaintext
+      const backupPath = backupDatabase(plainDb, config);
+      plainDb.close();
+
+      encryptDatabase(dbPath, key);
+
+      // Persist enabled:true so subsequent starts open the DB with the key.
+      config.security.encryption.enabled = true;
+      saveConfig(config, options.config);
+
+      console.log('');
+      f.success('Database encrypted at rest.');
+      f.info(`Backup (plaintext): ${backupPath}`);
+      f.warning('Store your key safely — losing ENGRAM_DB_KEY means losing the database.');
+      console.log('');
+    } catch (error) {
+      f.error(error.message);
+      process.exit(1);
+    }
+  });
+
+// Rekey command — rotate the encryption key on an already-encrypted DB
+program
+  .command('rekey <newKey>')
+  .description('Rotate the encryption key (requires current key in ENGRAM_DB_KEY)')
+  .option('--config <path>', 'Path to config file')
+  .option('--data-dir <path>', 'Override data directory (also: ENGRAM_DATA_DIR env)')
+  .action(async (newKey, options) => {
+    const f = await loadFormat();
+    try {
+      const currentKey = process.env.ENGRAM_DB_KEY;
+      if (!currentKey) {
+        f.error('Set ENGRAM_DB_KEY to the CURRENT passphrase before running `engram rekey`.');
+        process.exit(1);
+      }
+      if (!newKey) {
+        f.error('Provide the new passphrase: `engram rekey <newKey>`.');
+        process.exit(1);
+      }
+
+      const config = loadConfig(options.config, { dataDir: options.dataDir });
+      const db = initDatabase(getDatabasePath(config), { encryptionKey: currentKey });
+      rekeyDatabase(db, newKey);
+      db.close();
+
+      console.log('');
+      f.success('Encryption key rotated.');
+      f.warning('Update ENGRAM_DB_KEY to the new passphrase — the old key no longer opens the DB.');
+      console.log('');
     } catch (error) {
       f.error(error.message);
       process.exit(1);
