@@ -1,15 +1,28 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { recordCall, recordEvent, getStats, reset } from '../../src/llm/stats.js';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import {
+  recordCall,
+  recordEvent,
+  recordSkippedConfirmations,
+  getStats,
+  reset,
+  initStats
+} from '../../src/llm/stats.js';
 import { llmComplete } from '../../src/llm/index.js';
 import { extractMemoryLLM } from '../../src/extract/llm.js';
 import { resetBreaker } from '../../src/llm/breaker.js';
+import { initDatabase } from '../../src/memory/store.js';
 
 const realFetch = global.fetch;
 afterEach(() => {
   global.fetch = realFetch;
   vi.restoreAllMocks();
+  initStats(null); // unbind so the in-memory suites stay isolated
 });
 beforeEach(() => {
+  initStats(null);
   reset();
   resetBreaker();
 });
@@ -107,5 +120,67 @@ describe('instrumentation outcomes', () => {
     const r = await llmComplete({ llm: { provider: 'ollama', timeoutMs: 20 } }, { prompt: 'hi' });
     expect(r).toBeNull();
     expect(getStats().timeouts).toBe(1);
+  });
+});
+
+describe('DB-backed stats (cross-process)', () => {
+  let dir;
+  let dbPath;
+  let writer;
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'engram-stats-'));
+    dbPath = path.join(dir, 'memory.db');
+    writer = initDatabase(dbPath);
+    initStats(writer); // simulate the MCP (writer) process
+  });
+
+  afterEach(() => {
+    initStats(null);
+    if (writer) writer.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('persists counters so a second handle (the REST process) sees them', () => {
+    recordCall({ latencyMs: 200, status: 'ok', model: 'qwen3:1.7b' });
+    recordEvent({ op: 'extract', outcome: 'enhanced', latencyMs: 200, model: 'qwen3:1.7b' });
+
+    // Reader = a *different* DB handle on the same file (the REST process).
+    const reader = initDatabase(dbPath);
+    initStats(reader);
+    const s = getStats();
+    expect(s.calls).toBe(1);
+    expect(s.extractionsEnhanced).toBe(1);
+    expect(s.avgLatencyMs).toBe(200);
+    expect(s.recentEvents[0]).toMatchObject({ op: 'extract', outcome: 'enhanced' });
+    reader.close();
+  });
+
+  it('keeps recentEvents newest-first and bounded to 50', () => {
+    for (let i = 0; i < 60; i++) {
+      recordEvent({ op: 'extract', outcome: i % 2 ? 'enhanced' : 'fallback' });
+    }
+    const s = getStats();
+    expect(s.recentEvents.length).toBe(50);
+    // the very last event recorded was i=59 (odd) → 'enhanced'
+    expect(s.recentEvents[0].outcome).toBe('enhanced');
+    const rowCount = writer.prepare('SELECT COUNT(*) AS n FROM llm_events').get().n;
+    expect(rowCount).toBe(50);
+  });
+
+  it('accumulates skipped-confirmation counts', () => {
+    recordSkippedConfirmations(3);
+    recordSkippedConfirmations();
+    expect(getStats().contradictionsConfirmSkipped).toBe(4);
+  });
+
+  it('reset() clears both the tables and memory', () => {
+    recordCall({ latencyMs: 5, status: 'ok' });
+    recordEvent({ op: 'extract', outcome: 'enhanced' });
+    reset();
+    const s = getStats();
+    expect(s.calls).toBe(0);
+    expect(s.recentEvents).toEqual([]);
+    expect(writer.prepare('SELECT COUNT(*) AS n FROM llm_events').get().n).toBe(0);
   });
 });

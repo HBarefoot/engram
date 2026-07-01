@@ -12,6 +12,7 @@ import { recordFeedback, getFeedbackStats } from '../memory/feedback.js';
 import { generateContext } from '../memory/context.js';
 import { validateContent } from '../extract/secrets.js';
 import { extractMemoryLLM } from '../extract/llm.js';
+import { initStats } from '../llm/stats.js';
 import * as logger from '../utils/logger.js';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
@@ -61,6 +62,7 @@ export class EngramMCPServer {
     if (!this.db) {
       const dbPath = getDatabasePath(this.config);
       this.db = initDatabase(dbPath);
+      initStats(this.db); // share LLM stats across the REST + MCP processes
       logger.info('MCP Server database initialized', { path: dbPath });
     }
     return this.db;

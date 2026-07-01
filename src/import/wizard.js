@@ -2,6 +2,7 @@ import { createInterface } from 'readline';
 import os from 'os';
 import { detectSources, scanSources, commitMemories } from './index.js';
 import { initDatabase } from '../memory/store.js';
+import { initStats } from '../llm/stats.js';
 import { loadConfig, getDatabasePath } from '../config/index.js';
 import {
   printHeader, printSection, warning, info,
@@ -169,6 +170,7 @@ export async function runWizard(options = {}) {
     const commitSpin = spinner('Committing memories...');
     commitSpin.start();
     const db = initDatabase(getDatabasePath(config));
+    initStats(db);
 
     const commitResult = await commitMemories(db, scanResult.memories, {
       namespace: options.namespace
@@ -249,6 +251,7 @@ async function runNonInteractive(config, options) {
   const commitSpin = spinner('Committing memories...');
   commitSpin.start();
   const db = initDatabase(getDatabasePath(config));
+  initStats(db);
   const commitResult = await commitMemories(db, scanResult.memories, {
     namespace: options.namespace
   });

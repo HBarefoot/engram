@@ -13,7 +13,7 @@ import { calculateHealthScore } from '../memory/health.js';
 import { validateContent } from '../extract/secrets.js';
 import { extractMemoryLLM } from '../extract/llm.js';
 import { testLLM, isLLMEnabled } from '../llm/index.js';
-import { getStats as getLLMStats } from '../llm/stats.js';
+import { getStats as getLLMStats, initStats } from '../llm/stats.js';
 import { getBreakerState } from '../llm/breaker.js';
 
 /**
@@ -97,6 +97,7 @@ export function createRESTServer(config) {
 
   // Initialize database
   const db = initDatabase(getDatabasePath(config));
+  initStats(db); // share LLM stats across the REST + MCP processes
   const modelsPath = getModelsPath(config);
 
   // Migrate legacy tag-based conflicts to contradictions table
