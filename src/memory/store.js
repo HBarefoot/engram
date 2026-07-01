@@ -222,6 +222,28 @@ function runMigrations(db) {
     );
   }
 
+  // LLM observability tables (v1.10) — persist the optional-LLM-layer stats so
+  // they survive restarts AND are shared across the REST and MCP processes
+  // (previously an in-memory per-process singleton, so the dashboard could not
+  // see agent-side extractions). Local-only; still no telemetry. See
+  // src/llm/stats.js. Idempotent via CREATE TABLE IF NOT EXISTS.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS llm_stats (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS llm_events (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      ts        INTEGER NOT NULL,
+      op        TEXT,
+      outcome   TEXT,
+      latencyMs INTEGER,
+      model     TEXT
+    );
+  `);
+
   logger.debug('Database migrations completed');
 }
 
