@@ -6,6 +6,47 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-07-01
+
+A hardening release: **opt-in encryption at rest**, **`audit`/`purge` safety commands**, and a fix
+that makes the desktop **AI-Enhancement panel report real cross-process activity**. Everything here
+is additive or opt-in — the default behavior and the disabled-LLM path are byte-identical to 1.9.1.
+
+### Added
+
+- **🔐 Encryption at rest (opt-in, off by default)** — encrypt `memory.db` with **AES-256** via
+  `security.encryption`. The key is read from the **`ENGRAM_DB_KEY`** env var (or a `keyFile`),
+  never stored in plaintext. New commands **`engram encrypt`** (encrypt an existing plaintext DB,
+  backing up first) and **`engram rekey`** (rotate the key in place). Uses the drop-in
+  `better-sqlite3-multiple-ciphers` build, loaded lazily **only when a key is set** — an opt-in
+  dependency (`npm i better-sqlite3-multiple-ciphers`) with a clear message if it's missing. A
+  wrong/missing key surfaces a friendly "database is encrypted" error. Only `memory.db` is
+  encrypted (not the model cache). Docs: `docs/security/encryption.md`.
+- **🧹 `engram audit`** — read-only health + safety scan: re-runs secret detection over every
+  stored memory (catches anything saved before detection existed or via `force`), plus a rollup of
+  stale / never-recalled / duplicate memories, contradiction count, DB size, and encryption status.
+  Supports `--json` and `--fix`, and **exits non-zero when secrets are found** (usable as a CI gate).
+- **🧹 `engram purge`** — guarded bulk delete: **dry-run by default**, requires `--yes`, and
+  **backs up the database first**. Target with `--namespace` (alias `--project`), `--stale`,
+  `--before <date>`, or `--all`. Dependent feedback/contradiction rows clean up via existing FKs.
+  New shared `backupDatabase` helper (SQLite `VACUUM INTO`).
+
+### Fixed
+
+- **📊 Cross-process LLM observability** — the optional LLM layer's stats now persist to the
+  database (`llm_stats` + `llm_events`) instead of a per-process in-memory counter, so the desktop
+  **AI-Enhancement** panel reflects extractions performed by the **MCP server** and CLI, not just
+  its own process. `initStats(db)` is bound across the MCP server, REST server, and all one-shot
+  CLI commands. The `getStats()` contract is unchanged; with no DB bound (embedded/tests) it falls
+  back to in-memory.
+
+### Notes
+
+- All three features are **opt-in or additive**. With no encryption key set, the new commands
+  unused, and the LLM layer disabled, behavior is unchanged from 1.9.1.
+- Encryption protects data **at rest** (stolen disk / backup). It does not protect a running
+  process, and **losing your key means losing the database** — store it safely.
+
 ## [1.9.1] - 2026-06-30
 
 A small, opt-out **"star the repo" nudge** in Engram's human-facing surfaces. Most users reach

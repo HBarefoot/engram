@@ -70,3 +70,6 @@ ENGRAM_ACTION_PLAN.md
 
 docs/prompts/
 
+# Internal launch/strategy docs — keep local, never commit
+ENGRAM_LAUNCH_*.md
+
