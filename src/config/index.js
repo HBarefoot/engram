@@ -34,7 +34,12 @@ const DEFAULT_CONFIG = {
   },
   security: {
     secretDetection: true,
-    auditLog: false
+    auditLog: false,
+    encryption: {
+      enabled: false,      // opt-in; default installs are byte-for-byte unchanged
+      keyFile: null,       // optional path to a key file (env var wins); never the raw key
+      kdfIterations: 256000 // wxSQLite3 default; exposed for tuning
+    }
   }
 };
 
@@ -178,4 +183,42 @@ export function getDatabasePath(config) {
  */
 export function getModelsPath(config) {
   return path.join(config.dataDir, 'models');
+}
+
+/**
+ * Resolve the database encryption key, or null when encryption is off.
+ *
+ * The raw key is NEVER read from config.json (which is stored plaintext).
+ * Precedence when `security.encryption.enabled` is true:
+ *   1. ENGRAM_DB_KEY environment variable (preferred; CI/container friendly)
+ *   2. security.encryption.keyFile — a file containing the key (should be 0600)
+ *
+ * Returns null when encryption is disabled. Throws a clear error when encryption
+ * is enabled but no key can be found (so we never silently fall back to writing
+ * an unencrypted DB). The key value itself is never logged.
+ *
+ * @param {Object} config - Engram configuration
+ * @returns {string|null}
+ */
+export function resolveEncryptionKey(config) {
+  const enc = config?.security?.encryption;
+  if (!enc || !enc.enabled) return null;
+
+  const fromEnv = process.env.ENGRAM_DB_KEY;
+  if (fromEnv) return fromEnv;
+
+  if (enc.keyFile) {
+    const keyPath = resolveDataDir(enc.keyFile);
+    if (!fs.existsSync(keyPath)) {
+      throw new Error(`Encryption key file not found: ${keyPath}`);
+    }
+    const key = fs.readFileSync(keyPath, 'utf-8').trim();
+    if (!key) throw new Error(`Encryption key file is empty: ${keyPath}`);
+    return key;
+  }
+
+  throw new Error(
+    'Encryption is enabled but no key was found. Set the ENGRAM_DB_KEY environment ' +
+    'variable or security.encryption.keyFile in config.json.'
+  );
 }

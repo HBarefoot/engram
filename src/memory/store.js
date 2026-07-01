@@ -1,30 +1,136 @@
 import Database from 'better-sqlite3';
+import fs from 'fs';
+import { createRequire } from 'module';
 import { generateId } from '../utils/id.js';
 import * as logger from '../utils/logger.js';
 import { SIMILARITY_THRESHOLDS } from './constants.js';
+
+const require = createRequire(import.meta.url);
 
 const DUPLICATE_THRESHOLD = SIMILARITY_THRESHOLDS.DUPLICATE; // Nearly identical - reject
 const MERGE_THRESHOLD = SIMILARITY_THRESHOLDS.MERGE;         // Similar but adds info - merge
 
 /**
- * Initialize the database and run migrations
+ * Open an encrypted database using the optional cipher build.
+ *
+ * `better-sqlite3-multiple-ciphers` is an API-compatible fork of better-sqlite3
+ * that bundles wxSQLite3 (SQLCipher-compatible AES-256). It is NOT a hard
+ * dependency — loaded synchronously via require() only when a key is configured,
+ * so default installs add zero footprint. The cipher + key pragmas MUST run
+ * before any other statement touches the database.
+ *
+ * @param {string} dbPath
+ * @param {string} key
+ * @returns {Database}
+ */
+function openEncryptedDatabase(dbPath, key) {
+  let CipherDatabase;
+  try {
+    CipherDatabase = require('better-sqlite3-multiple-ciphers');
+  } catch {
+    throw new Error(
+      'Encryption requires the cipher build: run `npm i better-sqlite3-multiple-ciphers`.'
+    );
+  }
+  const db = new CipherDatabase(dbPath);
+  db.pragma("cipher='sqlcipher'");
+  db.pragma(`key='${String(key).replace(/'/g, "''")}'`); // escape single quotes
+  return db;
+}
+
+/**
+ * Initialize the database and run migrations.
+ *
+ * When `encryptionKey` is supplied the DB is opened with the optional cipher
+ * build and unlocked before any query; without it, the default synchronous
+ * better-sqlite3 path is byte-for-byte unchanged.
+ *
  * @param {string} dbPath - Path to SQLite database file
+ * @param {Object} [options]
+ * @param {string|null} [options.encryptionKey] - Passphrase for at-rest encryption
  * @returns {Database} SQLite database instance
  */
-export function initDatabase(dbPath) {
-  logger.info('Initializing database', { path: dbPath });
+export function initDatabase(dbPath, { encryptionKey = null } = {}) {
+  logger.info('Initializing database', { path: dbPath, encrypted: Boolean(encryptionKey) });
 
-  const db = new Database(dbPath);
+  const db = encryptionKey ? openEncryptedDatabase(dbPath, encryptionKey) : new Database(dbPath);
 
-  // Set pragmas for performance and safety
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
+  try {
+    // Set pragmas for performance and safety
+    db.pragma('journal_mode = WAL');
+    db.pragma('foreign_keys = ON');
 
-  // Run migrations
-  runMigrations(db);
+    // Run migrations (also the first real read — where a wrong key surfaces)
+    runMigrations(db);
+  } catch (err) {
+    // A wrong/missing key makes SQLite see ciphertext as a non-database.
+    if (encryptionKey && /not a database|SQLITE_NOTADB|file is encrypted/i.test(err.message)) {
+      try { db.close(); } catch { /* already unusable */ }
+      throw new Error(
+        'Database is encrypted — wrong or missing ENGRAM_DB_KEY (or the file is not a valid encrypted database).'
+      );
+    }
+    throw err;
+  }
+
+  if (encryptionKey) {
+    // Record that this store is encrypted (surfaced by `engram audit`).
+    db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)')
+      .run('encryption_enabled_v1', new Date().toISOString());
+  }
 
   logger.info('Database initialized successfully');
   return db;
+}
+
+/**
+ * Encrypt an existing plaintext database in place.
+ *
+ * Uses wxSQLite3's `PRAGMA rekey`, which re-writes every page under the given
+ * key. We first fold any WAL into the main file and switch off WAL mode
+ * (rekeying is a whole-file rewrite), then rekey. The caller should back up
+ * first (bin/engram.js does). After this the file only opens with the key.
+ *
+ * @param {string} dbPath - Path to the plaintext database
+ * @param {string} key - Passphrase to encrypt with
+ */
+export function encryptDatabase(dbPath, key) {
+  let CipherDatabase;
+  try {
+    CipherDatabase = require('better-sqlite3-multiple-ciphers');
+  } catch {
+    throw new Error(
+      'Encryption requires the cipher build: run `npm i better-sqlite3-multiple-ciphers`.'
+    );
+  }
+
+  const db = new CipherDatabase(dbPath); // opens the plaintext source
+  db.pragma('wal_checkpoint(TRUNCATE)'); // fold any WAL into the main file first
+  db.pragma('journal_mode = DELETE');    // rekey rewrites the whole file
+  db.pragma("cipher='sqlcipher'");
+  db.pragma(`rekey='${String(key).replace(/'/g, "''")}'`);
+  db.close();
+
+  // Drop any stale plaintext sidecars; the encrypted DB makes fresh ones.
+  for (const sidecar of [`${dbPath}-wal`, `${dbPath}-shm`]) {
+    if (fs.existsSync(sidecar)) fs.rmSync(sidecar, { force: true });
+  }
+  logger.info('Database encrypted');
+}
+
+/**
+ * Change the key on an already-encrypted, open database (wxSQLite3 rekey).
+ * Rekey rewrites the whole file and is not supported under WAL, so we fold the
+ * WAL in and switch to DELETE journalling for the rewrite (initDatabase restores
+ * WAL on the next open).
+ * @param {Database} db - An open, unlocked encrypted database
+ * @param {string} newKey - The new passphrase
+ */
+export function rekeyDatabase(db, newKey) {
+  db.pragma('wal_checkpoint(TRUNCATE)');
+  db.pragma('journal_mode = DELETE');
+  db.pragma(`rekey='${String(newKey).replace(/'/g, "''")}'`);
+  logger.info('Database key rotated');
 }
 
 /**
