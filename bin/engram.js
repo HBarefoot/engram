@@ -921,6 +921,69 @@ program
     }
   });
 
+// Skill command — install/uninstall the bundled `engram-memory` agent skill.
+// The MCP server is the capability; the skill is the judgment layer that teaches
+// an agent WHEN to recall and WHAT to store. Explicit opt-in only — Engram never
+// writes a skill during `npm install` or `engram start` (no surprises).
+const skill = program
+  .command('skill')
+  .description('Manage the engram-memory agent skill (teaches agents to use memory well)');
+
+skill
+  .command('install')
+  .description("Install the engram-memory skill into an AI assistant's skills directory")
+  .option('--project', 'Install into the current project (./.claude or ./.agents) instead of your home dir')
+  .option('--platform <name>', 'Skill host: "claude" (~/.claude) or "agents" (~/.agents, cross-framework)', 'claude')
+  .action(async (options) => {
+    const f = await loadFormat();
+    try {
+      const { installSkill } = await import('../src/skill/install.js');
+      const result = installSkill({ project: options.project, platform: options.platform });
+
+      if (result.status === 'unchanged') {
+        f.info(`engram-memory skill already up to date at ${result.dest}`);
+      } else if (result.status === 'updated') {
+        f.success(`Updated engram-memory skill at ${result.dest}`);
+        f.info(`Previous version backed up to ${result.backup}`);
+      } else {
+        f.success(`Installed engram-memory skill to ${result.dest}`);
+      }
+
+      if (result.project) {
+        const dot = result.platform === 'agents' ? '.agents' : '.claude';
+        console.log('');
+        f.info(`Commit it so your team gets it too:  git add ${dot}/skills/engram-memory`);
+      }
+
+      console.log('');
+      f.info('Restart your AI assistant to pick up the new skill.');
+    } catch (error) {
+      f.error(`Skill install error: ${error.message}`);
+      process.exit(1);
+    }
+  });
+
+skill
+  .command('uninstall')
+  .description('Remove the engram-memory skill (leaves other skills and backups untouched)')
+  .option('--project', 'Target the current project instead of your home dir')
+  .option('--platform <name>', 'Skill host: "claude" or "agents"', 'claude')
+  .action(async (options) => {
+    const f = await loadFormat();
+    try {
+      const { uninstallSkill } = await import('../src/skill/install.js');
+      const result = uninstallSkill({ project: options.project, platform: options.platform });
+      if (result.removed) {
+        f.success(`Removed engram-memory skill from ${result.dest}`);
+      } else {
+        f.info(`No engram-memory skill found at ${result.dest} — nothing to remove.`);
+      }
+    } catch (error) {
+      f.error(`Skill uninstall error: ${error.message}`);
+      process.exit(1);
+    }
+  });
+
 // MCP-first default: when an MCP client/proxy/registry spawns `node bin/engram.js`
 // with no subcommand over a piped (non-TTY) stdin, boot the stdio server instead
 // of printing help and exiting. Interactive `engram` in a terminal still shows help.

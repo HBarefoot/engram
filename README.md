@@ -185,6 +185,20 @@ Engram exposes 6 tools to AI agents over stdio:
 
 ---
 
+## Teach your agent to use Engram
+
+Connecting the MCP server gives your agent the memory *tools* — but not the judgment to use them well. The bundled **`engram-memory` skill** is that judgment layer: it teaches an agent to recall at the start of a session, store durable decisions, corrections, and outcomes as they happen, and write results back at the end — without being told each time.
+
+```bash
+engram skill install                     # → ~/.claude/skills/engram-memory/
+engram skill install --project           # → ./.claude/skills/  (commit it for your team)
+engram skill install --platform agents   # → ~/.agents/skills/  (cross-framework)
+```
+
+Works in Claude Code, Claude Desktop, Cowork, or any framework that reads the [Agent Skills](https://github.com/anthropics/skills) spec (`.agents/skills`). The skill is vendored in the package, so it versions with Engram and updates land on the next `engram skill install`; `engram skill uninstall` removes it cleanly.
+
+---
+
 ## CLI Reference
 
 ```bash
@@ -205,6 +219,10 @@ engram export-context              # Export curated context block
                                    # (-o file -f markdown|claude|txt|json -c categories --min-confidence ...)
 engram import                      # Import from local sources
                                    # (-s cursorrules|claude|package|git|ssh|shell|obsidian|env --dry-run)
+
+engram skill install               # Install the engram-memory agent skill
+                                   # (--project → ./.claude, --platform agents → ~/.agents)
+engram skill uninstall             # Remove the engram-memory skill
 ```
 
 Run `engram --help` for the full flag list.
