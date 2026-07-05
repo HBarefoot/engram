@@ -6,6 +6,12 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-07-05
+
+A distribution release: Engram now ships the **judgment layer**, not just the capability. The MCP
+server has always given agents memory *tools*; the bundled `engram-memory` skill teaches them how to
+use those tools well. Additive and opt-in — nothing installs unless you run `engram skill install`.
+
 ### Added
 
 - **🧠 `engram-memory` agent skill + `engram skill install`** — Engram now ships the judgment
