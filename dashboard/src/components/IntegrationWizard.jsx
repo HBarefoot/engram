@@ -15,6 +15,17 @@ export default function IntegrationWizard({ onClose }) {
   const [installationInfo, setInstallationInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [skillCopied, setSkillCopied] = useState(false);
+
+  const copySkillCommand = async () => {
+    try {
+      await navigator.clipboard.writeText('engram skill install');
+      setSkillCopied(true);
+      setTimeout(() => setSkillCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   useEffect(() => {
     loadInstallationInfo();
@@ -116,6 +127,30 @@ export default function IntegrationWizard({ onClose }) {
                 installationPath={installationInfo.installation.binPath}
                 platformOS={installationInfo.installation.platform}
               />
+
+              {/* Skill install — the judgment layer that teaches agents to use memory well */}
+              <div className="card card--pad" style={{ borderColor: 'color-mix(in oklab, var(--accent) 30%, transparent)', background: 'color-mix(in oklab, var(--accent) 8%, var(--surface-1))' }}>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <h4 className="font-semibold mb-1" style={{ color: 'var(--text-hi)' }}>
+                      Teach your agent to use memory well
+                    </h4>
+                    <p className="text-sm mb-3" style={{ color: 'var(--text-mid)' }}>
+                      The config above gives your agent the memory tools. This one-time install adds the{' '}
+                      <code className="mono px-1 rounded" style={{ background: 'var(--surface-2)', color: 'var(--text-hi)' }}>engram-memory</code>{' '}
+                      skill — the judgment layer that teaches it <em>when</em> to recall and <em>what</em> to store.
+                      Works in Claude Code, Cowork, or any <code className="mono">.agents/skills</code> framework.
+                    </p>
+                    <pre className="p-3 rounded-lg overflow-x-auto text-sm mono" style={{ background: 'var(--surface-2)', color: 'var(--text-hi)', border: '1px solid var(--border)' }}>
+                      <code>engram skill install</code>
+                    </pre>
+                  </div>
+                  <button onClick={copySkillCommand} className="btn btn--sm">
+                    {skillCopied ? '✓ Copied!' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+
               <div className="flex justify-between pt-4">
                 <button
                   onClick={handleBack}

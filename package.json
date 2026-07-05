@@ -11,6 +11,7 @@
   "files": [
     "bin",
     "src",
+    "skills",
     "dashboard/dist",
     "dashboard/package.json",
     "README.md",

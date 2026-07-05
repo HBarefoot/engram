@@ -6,6 +6,22 @@ Versions marked *(unpublished)* exist in git history but were never released to 
 
 ## [Unreleased]
 
+### Added
+
+- **🧠 `engram-memory` agent skill + `engram skill install`** — Engram now ships the judgment
+  layer, not just the capability. The MCP server gives an agent memory *tools*; the bundled
+  `engram-memory` skill teaches it *when* to recall and *what* to store — recall at session start,
+  persist durable decisions/corrections/outcomes, write results back at the end — without being
+  prompted each time. The skill is vendored in-repo at `skills/engram-memory/` (source of truth, so
+  it versions with the package). New command **`engram skill install`** copies it into an
+  assistant's skill directory: default `~/.claude/skills/engram-memory/`, `--project` for
+  `./.claude/skills/` (with a `git add` hint), and `--platform agents` for the cross-framework
+  `~/.agents/skills/` ([Agent Skills](https://github.com/anthropics/skills) spec). Installs are
+  idempotent and **back up any previous version** before overwriting (repo rule #8); other skills
+  are never touched. **`engram skill uninstall`** removes exactly the `engram-memory` directory.
+  Explicit opt-in only — nothing is installed during `npm install` or `engram start`. The dashboard
+  Integration wizard and README now surface the one-liner.
+
 ## [1.10.0] - 2026-07-01
 
 A hardening release: **opt-in encryption at rest**, **`audit`/`purge` safety commands**, and a fix
