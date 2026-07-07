@@ -6,7 +6,7 @@
 
 ⭐ **Useful to you? [Star it on GitHub](https://github.com/HBarefoot/engram)** — it's the simplest way to help others find Engram.
 
-[![CI](https://github.com/HBarefoot/engram/actions/workflows/ci.yml/badge.svg)](https://github.com/HBarefoot/engram/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/HBarefoot/engram/ci.yml?branch=main&label=CI)](https://github.com/HBarefoot/engram/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/@hbarefoot/engram)](https://www.npmjs.com/package/@hbarefoot/engram)
 [![Website](https://img.shields.io/badge/website-engram-6d7bff)](https://next.henrybarefoot.com/engram)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
